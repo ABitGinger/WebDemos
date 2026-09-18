@@ -62,6 +62,19 @@ python -m http.server 8000
 GitHub App 令牌，工作流自带的 `GITHUB_TOKEN` 去建 Pages 站点会直接报
 `Resource not accessible by integration`。所以工作流里不带这个开关。
 
+### 资源地址里的 `?v=__BUILD__`
+
+`index.html` 引样式和脚本时带了个占位符：`assets/hub.css?v=__BUILD__`。部署时
+`pages.yml` 会把它换成当次提交的短 SHA（本地打开时它就是个普通查询串）。
+
+原因是 GitHub Pages 给静态文件加的缓存大约 10 分钟：资源 URL 如果一直不变，改版后
+浏览器或 CDN 就会拿**新的页面配旧的样式**——页头因此坏过一次（计数行被标签行压住、
+搜索框被撑成整页宽的长条）。每次部署换一个新 URL，页面和资源就永远配对。
+
+**所以别把它改成固定版本号，也别删掉。** 唯一例外是主站首页那条引用（它指向别的仓库、
+没法自动跟着版本走），改完 `hub.css` 后主站首页最多 10 分钟内可能仍是旧样式，
+`Ctrl + F5` 一次即可。
+
 ### 地址为什么是 `/WebDemos/`
 
 GitHub Pages 的路径规则只有两条，没有第三条：

@@ -7,8 +7,13 @@
     <title>姜的演示厅</title>
     <meta name="description" content="姜的一些跑在浏览器里的小演示：点击卡片就地放大打开，也可以拎出来用独立地址单独看。">
     <link rel="icon" href="../favicon.ico">
-    <link rel="stylesheet" href="assets/hub.css?v=1.0.0">
-    <script src="assets/hub.js?v=1.0.0" defer></script>
+    <!-- 下面两行的 ?v=__BUILD__ 是个占位符：部署时由 .github/workflows/pages.yml
+         替换成当次提交的短 SHA。GitHub Pages 会给静态文件加约 10 分钟的缓存，
+         如果资源 URL 一直不变，改版后浏览器/CDN 就可能拿「新页面 + 旧样式」拼在一起用
+         （页头因此被渲染错过一次）。换个 URL 就能保证页面和它引用的资源永远配对。
+         本地直接打开时它只是个普通查询串，不影响任何东西；别手动改成固定版本号。 -->
+    <link rel="stylesheet" href="assets/hub.css?v=__BUILD__">
+    <script src="assets/hub.js?v=__BUILD__" defer></script>
 </head>
 
 <body class="dm-standalone">

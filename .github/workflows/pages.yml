@@ -47,6 +47,27 @@ jobs:
         continue-on-error: true
         run: python scripts/check.py
 
+      # 把 index.html 里 assets/hub.{css,js} 的 ?v=__BUILD__ 换成当次提交的短 SHA。
+      #
+      # 为什么需要这一步：GitHub Pages 给静态文件发的缓存头大约 10 分钟。如果资源 URL
+      # 永远不变，改版后浏览器或 CDN 就会把「新的 index.html / hub.js」和「旧的 hub.css」
+      # 拼在一起用 —— 曾经真的因此把页头渲染成：计数行被标签行压住、搜索框被撑成整页宽。
+      # 每次部署换一个新 URL，页面和它引用的资源就永远配对；代价只是每次多下载一次资源。
+      #
+      # 失败时直接报错停止：占位符没换掉等于把 __BUILD__ 当版本号发出去，
+      # 那还不如不发（下一个提交又会是同一个 URL，缓存问题原样复发）。
+      - name: 给静态资源打上版本号
+        run: |
+          set -euo pipefail
+          V="${GITHUB_SHA:0:7}"
+          sed -i "s/__BUILD__/${V}/g" index.html
+          if grep -q "__BUILD__" index.html; then
+            echo "::error title=版本号没写进去::index.html 里还残留 __BUILD__ 占位符"
+            exit 1
+          fi
+          echo "本次部署的资源版本号 = ${V}"
+          grep -n 'assets/hub\.' index.html
+
       # 这里刻意不带 enablement: true。
       # 那个开关想用工作流自带的 GITHUB_TOKEN 去调 POST /repos/{owner}/{repo}/pages
       # 建 Pages 站点，而 GITHUB_TOKEN 没有这个权限，必然报
