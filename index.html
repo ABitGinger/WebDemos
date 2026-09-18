@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>姜的演示厅</title>
+    <meta name="description" content="姜的一些跑在浏览器里的小演示：点击卡片就地放大打开，也可以拎出来用独立地址单独看。">
+    <link rel="icon" href="../favicon.ico">
+    <link rel="stylesheet" href="assets/hub.css?v=1.0.0">
+    <script src="assets/hub.js?v=1.0.0" defer></script>
+</head>
+
+<body class="dm-standalone">
+    <!-- 页眉与页脚和主站 ABitGinger.github.io 保持一致；
+         被主站「静默跳转」接进去时只会取用下面的 <main>，这两块不会重复出现。
+         注意：这里的 nav 用相对路径，独立访问时也不会跑偏。 -->
+    <header>
+        <nav>
+            <ul>
+                <li><a href="https://abitginger.top/blog/about/" target="_blank">关于姜</a></li>
+                <li><a href="https://github.com/ABitGinger" target="_blank">Github</a></li>
+                <li><a href="https://github.com/ABitGinger/WebDemos" target="_blank">本仓库</a></li>
+                <li><a id="email-text" class="email-text">📧发送邮件</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="content">
+        <section class="dm-root">
+            <div class="dm-hero">
+                <h1>🧪 <span class="dm-hero-mark" id="dm-hero-title">姜的演示厅</span></h1>
+                <p id="dm-hero-sub">一些跑在浏览器里的小玩意 · 点开卡片就地展开，也可以拎出来单独看</p>
+                <div class="dm-hero-rule"></div>
+            </div>
+
+            <div class="dm-toolbar">
+                <a class="dm-backlink" href="../" data-silent>← 返回主页</a>
+                <span class="dm-count" id="dm-summary"></span>
+                <label class="dm-search">
+                    <input id="dm-search" type="search" placeholder="搜个关键字…" autocomplete="off"
+                        aria-label="搜索演示">
+                    <button class="dm-search-clear" type="button" aria-label="清空搜索">✕</button>
+                </label>
+            </div>
+
+            <div class="dm-tags" id="dm-tags" role="group" aria-label="按标签筛选"></div>
+
+            <div class="dm-grid" id="dm-grid"></div>
+
+            <div class="dm-status" id="dm-status" hidden></div>
+
+            <noscript>
+                <div class="dm-status">
+                    演示厅的清单是脚本渲染的，请开启 JavaScript；也可以直接访问
+                    <code>/demo/&lt;演示名&gt;/</code> 打开任意一个演示。
+                </div>
+            </noscript>
+        </section>
+    </main>
+
+    <footer>
+        <p>版权所有 &copy; 壹位姜 2024 - <script>document.write(new Date().getFullYear())</script></p>
+        <p>页面背景建筑师：realYosh 于姜的生存服作</p>
+        <a href="https://beian.miit.gov.cn" target="_blank">吉ICP备2024023158号</a>
+        <br>
+        <img src="https://beian.mps.gov.cn/img/logo01.dd7ff50e.png" width="20" /> <a
+            href="https://beian.mps.gov.cn/#/query/webSearch?code=21029602000999" rel="noreferrer"
+            target="_blank">辽公网安备21029602000999号</a>
+    </footer>
+
+    <script>
+        /* 页脚邮箱复制：主站由 /js/script.js 负责，独立访问 /demo/ 时由这里补上。
+           这段写在 <main> 之外，静默跳转时不会被搬进主站，避免重复绑定。 */
+        (function () {
+            var el = document.getElementById('email-text');
+            if (!el) return;
+            var mail = 'abitginger@foxmail.com';
+            el.addEventListener('mouseover', function () { el.textContent = '📋复制地址'; });
+            el.addEventListener('mouseout', function () { el.textContent = '📧发送邮件'; });
+            el.addEventListener('click', function () {
+                navigator.clipboard.writeText(mail).then(function () {
+                    el.textContent = '复制成功✔️';
+                }).catch(function () {
+                    el.textContent = '复制失败❌';
+                });
+            });
+        })();
+    </script>
+</body>
+
+</html>
