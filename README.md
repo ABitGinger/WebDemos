@@ -57,8 +57,10 @@ python -m http.server 8000
 **这个仓库的 GitHub Pages 就是正式站点，push 到 `main` 即上线**（零构建：仓库里的
 文件就是站点产物）。工作流见 [`.github/workflows/pages.yml`](./.github/workflows/pages.yml)。
 
-首次需要在仓库 `Settings → Pages → Source` 里选 `GitHub Actions`；工作流里的
-`configure-pages` 带了 `enablement: true`，通常能自动打开。
+首次需要在仓库 `Settings → Pages → Source` 里选 `GitHub Actions`，**这一步只能手动点**。
+`configure-pages` 的 `enablement: true` 看着像能自动开，实际不行——它需要 PAT 或
+GitHub App 令牌，工作流自带的 `GITHUB_TOKEN` 去建 Pages 站点会直接报
+`Resource not accessible by integration`。所以工作流里不带这个开关。
 
 ### 地址为什么是 `/WebDemos/`
 

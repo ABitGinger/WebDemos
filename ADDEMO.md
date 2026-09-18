@@ -242,6 +242,10 @@ python -m http.server 8000
 - **什么都不用做**：`git push` 到 `main`，约 1 分钟后线上就是最新的。
 - **看进度**：本仓库的 Actions → 「部署演示厅」。
 - **手动重跑**：Actions → 部署演示厅 → Run workflow。
+- **首次部署**：仓库 `Settings → Pages → Source` 选 `GitHub Actions`，**只能手动点**。
+  ⚠️ 不要用 `configure-pages` 的 `enablement: true` 去「自动打开」——它需要 PAT 或
+  GitHub App 令牌才能建 Pages 站点，工作流自带的 `GITHUB_TOKEN` 会报
+  `HttpError: Resource not accessible by integration`，这一步会直接把部署打断。
 
 主站 `ABitGinger.github.io` 只做一件相关的事：它的首页 `<head>` 里预加载了
 `/WebDemos/assets/hub.css` 与 `/WebDemos/assets/hub.js`，好让首页点「🧪 演示厅」时

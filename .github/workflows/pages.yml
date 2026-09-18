@@ -5,12 +5,12 @@
 # 单个演示：https://abitginger.top/WebDemos/demos/<slug>/
 #
 # 零构建：仓库里的文件就是站点产物，直接上传整个仓库。
-# upload-pages-artifact 会自动排除 .git、.github 以及根目录下所有点开头的文件，
-# 所以工作流和 .gitignore 不会出现在站点上（README.md / ADDEMO.md / scripts/ 会，
-# 但仓库本来就是公开的，无所谓）。
+# upload-pages-artifact 会永远排除 .git 与 .github，并且默认排除根目录下所有点开头的
+# 文件（include-hidden-files 默认 false），所以工作流和 .gitignore 不会出现在站点上。
+# README.md / ADDEMO.md / scripts/ 会被发布出去，但仓库本来就是公开的，无所谓。
 #
-# 首次部署：仓库 Settings → Pages → Source 选 GitHub Actions；
-# 下面的 configure-pages 带 enablement: true，通常能自动打开。
+# ⚠️ 首次部署必须手动开一次：仓库 Settings → Pages → Source 选 GitHub Actions。
+#    不要让工作流去开 —— 那需要 PAT，见下面 Setup Pages 那一步的注释。
 name: 部署演示厅
 
 on:
@@ -35,10 +35,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.x"
 
@@ -47,16 +47,21 @@ jobs:
         continue-on-error: true
         run: python scripts/check.py
 
+      # 这里刻意不带 enablement: true。
+      # 那个开关想用工作流自带的 GITHUB_TOKEN 去调 POST /repos/{owner}/{repo}/pages
+      # 建 Pages 站点，而 GITHUB_TOKEN 没有这个权限，必然报
+      #   HttpError: Resource not accessible by integration
+      # configure-pages 自己的定义里也写明了：enablement「requires a token other than
+      # GITHUB_TOKEN to be provided」（需要 PAT 或 GitHub App 令牌）。
+      # 所以开启 Pages 这件事只能在 Settings → Pages 里点一次，点完这步就正常了。
       - name: Setup Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
+        uses: actions/configure-pages@v6
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: "."
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
