@@ -2,9 +2,11 @@
 
 一些跑在浏览器里的小网页演示，只包含 html / css / js，**纯静态、零构建**。
 
-- 🎪 演示厅主页：<https://abitginger.github.io/demo/>
-- 🎯 单个演示：`https://abitginger.github.io/demo/demos/<slug>/`
-- 🧪 仓库预览（同一份内容）：<https://abitginger.github.io/WebDemos/>
+- 🎪 演示厅主页：<https://abitginger.top/WebDemos/>
+- 🎯 单个演示：`https://abitginger.top/WebDemos/demos/<slug>/`
+
+> 主机名一律写 `abitginger.top` —— 那才是本账号的正式域名。`abitginger.github.io/...`
+> 是同一个站点的别名，访问会 301 过去，路径完全一样。本文档下同。
 
 主页上，每张卡片都是活的（封面由 canvas 现场程序化绘制）。点卡片会**就地放大占满屏幕**，
 渐变出一个加载幕，然后把演示装进 iframe 跑起来——页眉页脚不动、不刷新页面。
@@ -23,7 +25,7 @@
 2. 在 `demos.json` 的 `demos` 数组里加一条（`slug` 要和目录名一致）
 3. `python scripts/check.py` 全是 0 错误，提交
 
-独立地址 `/demo/demos/<slug>/` 是**自动生成**的，不用做任何配置。
+独立地址 `/WebDemos/demos/<slug>/` 是**自动生成**的，不用做任何配置。
 
 ---
 
@@ -52,8 +54,39 @@ python -m http.server 8000
 
 ## 部署
 
-`/demo/` 不是本仓库的 Pages，而是主站 `ABitGinger.github.io` 在构建时把本仓库
-clone 进它的 `demo/` 目录后一起发布的（见主站的 `.github/workflows/static.yml`）。
-本仓库推完代码后，主站的定时任务最迟 1 小时内会同步；想立刻生效就在主站 Actions 里
-手动跑一次构建，或在本仓库配置 `HOMEPAGE_DISPATCH_TOKEN` 让 push 自动触发（见
-[ADDEMO.md](./ADDEMO.md) 第 5 节）。
+**这个仓库的 GitHub Pages 就是正式站点，push 到 `main` 即上线**（零构建：仓库里的
+文件就是站点产物）。工作流见 [`.github/workflows/pages.yml`](./.github/workflows/pages.yml)。
+
+首次需要在仓库 `Settings → Pages → Source` 里选 `GitHub Actions`；工作流里的
+`configure-pages` 带了 `enablement: true`，通常能自动打开。
+
+### 地址为什么是 `/WebDemos/`
+
+GitHub Pages 的路径规则只有两条，没有第三条：
+
+| 仓库 | 发布到 |
+| --- | --- |
+| `ABitGinger.github.io`（根站，仓库名必须等于 `<用户名>.github.io`） | `/` —— **站内路径随便起** |
+| 其他仓库（项目站点） | `/<仓库名>/` —— 路径**等于仓库名，不可配置** |
+
+**自定义域名只换主机名，不换路径。** 主站的正式域名是 `abitginger.top`，于是它名下的
+项目站点全部平移成 `abitginger.top/<仓库名>/`：
+
+```
+abitginger.github.io/mcdoc/   →   abitginger.top/mcdoc/
+```
+
+所以本仓库的地址前缀只能是 `/WebDemos/`。曾经用过 `/demo/` —— 那是把内容复制进主站
+根站目录的做法，跨仓库复制没必要，已经废弃。
+
+### 和主站的关系（两条很轻的耦合）
+
+1. 主站首页的 `<head>` 预加载了 `/WebDemos/assets/hub.css` 与 `/WebDemos/assets/hub.js`。
+   这是必要的：主站的「静默跳转」只替换 `<main>`、不会重新加载 `<head>` 里的资源，
+   所以首页点「🧪 演示厅」时得靠预先加载好的这两个文件把卡片渲染出来（主站 `/repos/`
+   的 `js/repos.js` 同理）。反过来说，这两个文件**同时服务两个宿主**，改动既有行为前
+   要整体考虑；它们用 `.dm-` 前缀 + `body.dm-standalone` 做了隔离，挂在主站上不会
+   污染主站样式。
+2. 演示厅的 favicon 写的是 `../favicon.ico`，也就是主站根目录那个（同源，取得到）。
+
+除此之外两个仓库互不相干：本仓库改了直接生效，不需要主站重新构建。

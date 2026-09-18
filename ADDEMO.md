@@ -14,14 +14,34 @@
 | 项目 | 值 |
 | --- | --- |
 | 仓库 | `ABitGinger/WebDemos` |
-| 演示厅主页（正式） | `https://abitginger.github.io/demo/` |
-| 单个演示 | `https://abitginger.github.io/demo/demos/<slug>/` |
-| 仓库预览（同一份内容的备份地址） | `https://abitginger.github.io/WebDemos/` |
-| 主站 | `ABitGinger/ABitGinger.github.io`（`/demo/` 由它构建时同步生成） |
+| 演示厅主页（正式） | `https://abitginger.top/WebDemos/` |
+| 单个演示 | `https://abitginger.top/WebDemos/demos/<slug>/` |
+| 主站 | `ABitGinger/ABitGinger.github.io`（首页 `<head>` 预加载 hub 资源，见第 5 节） |
 
-`/demo/` **不是**这个仓库的 GitHub Pages，而是主站 `ABitGinger.github.io` 在
-构建时 `git clone` 本仓库、整份复制进它自己的 `demo/` 目录后一起发布的。
-所以本仓库推完代码后，还需要主站重新构建一次才能上线（见第 5 节）。
+> 主机名一律写 `abitginger.top` —— 那才是本账号的正式域名。`abitginger.github.io/...`
+> 是同一个站点的别名，访问会 301 过去，**路径完全一样**。
+
+**`/WebDemos/` 就是本仓库自己的 GitHub Pages**，由 `.github/workflows/pages.yml`
+在 push 到 `main` 时部署，零构建。曾经还有一套 `/demo/` 方案（让主站构建时 clone
+本仓库、复制进它的 `demo/` 目录），已经废弃 —— 多一层跨仓库复制没有必要。
+
+### URL 规则（别记错，很多人在这里绕圈）
+
+GitHub Pages 的路径规则只有两条，没有第三条：
+
+- 仓库名等于 `<用户名>.github.io` → 发布到 `/`，**站内路径随便起**；
+- 其他仓库（项目站点）→ 发布到 `/<仓库名>/`，**路径等于仓库名，不可配置**。
+
+**自定义域名只换主机名，不换路径。** 主站正式域名是 `abitginger.top`，它名下的项目
+站点就全部平移成 `abitginger.top/<仓库名>/`：`abitginger.github.io/mcdoc/` 会 301 到
+`abitginger.top/mcdoc/`（`mcdoc` 仓库自己的 `site_config.json` 里，`site_root_url`
+也写死为 `/mcdoc/` —— 因为仓库就叫 `mcdoc`）。
+
+所以本仓库的地址前缀只能是 `/WebDemos/`，**改不了**。想换前缀只有两条路：把仓库
+**改名**，或者把内容塞进根站仓库（后者就是被废弃的 `/demo/` 方案）。
+
+推论：**不要去改 `demos/` 下面目录的名字来凑路径** —— 目录名只决定
+`/WebDemos/demos/<slug>/` 的后半段，和前缀无关。
 
 ---
 
@@ -41,11 +61,11 @@ WebDemos/
 ├─ scripts/
 │  ├─ check.py             清单与目录的一致性校验
 │  └─ vendor_demos.py      一次性搬运脚本，平时不用管
-└─ .github/workflows/      部署与通知
+└─ .github/workflows/      部署（pages.yml：push 到 main 即上线）
 ```
 
 **一个演示 = 一个文件夹 + `index.html`。** 文件夹名（即 `slug`）会成为 URL 的一段，
-所以叫 `/demo/demos/<slug>/` 这个独立地址是**自动生成**的，不需要额外配置。
+所以叫 `/WebDemos/demos/<slug>/` 这个独立地址是**自动生成**的，不需要额外配置。
 
 不需要构建、不需要 `npm`、不需要打包。写什么就是什么。
 
@@ -81,13 +101,23 @@ demos/<slug>/...             ← 该演示自己的 css / js / 图片，随便�
 ### 第 3 步 · 加「返回演示厅」胶囊（推荐）
 
 演示厅里用的是内嵌 iframe，主页已经有返回按钮了；但**独立打开**这个 URL 时
-（`/demo/demos/<slug>/`）用户会需要一个回去的路。所以推荐在演示的
+（`/WebDemos/demos/<slug>/`）用户会需要一个回去的路。所以推荐在演示的
 `</body>` 前原样粘这一段——它被 iframe 装时会**自动把自己删掉**，独立访问才出现：
 
 ```html
 <!-- ↓↓↓ 演示厅 SDK：独立访问时提供「返回演示厅」入口；被演示厅内嵌（iframe）时自动隐藏 -->
-<a id="wb-back" href="../" title="返回演示厅">← 演示厅</a>
-<script>(function(){if(window.self!==window.top){var e=document.getElementById('wb-back');if(e)e.parentNode.removeChild(e);}})();</script>
+<a id="wb-back" href="../../" title="返回演示厅">← 演示厅</a>
+<script>
+/* 演示厅 SDK：href 由自身路径反推，换挂载点（/WebDemos/、/demo/…）或改层级都不用动这里。
+   演示固定放在 <演示厅根>/demos/<slug>/ 下，所以砍掉这段尾巴就是演示厅根。 */
+(function () {
+  var a = document.getElementById('wb-back');
+  if (!a) return;
+  if (window.self !== window.top) { a.parentNode.removeChild(a); return; }
+  var hall = location.pathname.replace(/demos\/[^/]+\/.*$/, '');
+  if (hall && hall !== location.pathname) a.href = hall;
+})();
+</script>
 <style>
 #wb-back{position:fixed;left:12px;bottom:12px;z-index:2147483000;display:inline-flex;align-items:center;
   padding:6px 13px;border-radius:999px;text-decoration:none;color:#fff;opacity:.42;
@@ -100,7 +130,10 @@ demos/<slug>/...             ← 该演示自己的 css / js / 图片，随便�
 <!-- ↑↑↑ 演示厅 SDK 结束 -->
 ```
 
-`href="../"` 是相对路径，正好回到 `/demo/`（或仓库预览的 `/WebDemos/`），不要改成绝对地址。
+`href="../../"` 是**两层**：演示在 `<演示厅根>/demos/<slug>/` 下，回到演示厅要上跳两层。
+写成 `../` 会停在 `demos/` 目录（404）。后面那句脚本是为了不依赖层级 —— 它直接从
+地址栏反推演示厅根，所以以后改目录结构（或换挂载点）它都不会错，`href` 上的
+`../../` 只是没跑 JS 时的兜底。
 
 ### 第 4 步 · 写进 demos.json
 
@@ -172,7 +205,7 @@ python -m http.server 8000
 修正窄屏下卡片间距
 ```
 
-推上去之后，主站还需要重新构建才会更新 `/demo/`（见下）。
+推上去约 1 分钟后，`abitginger.top/WebDemos/` 就是最新的（见第 5 节）。
 
 ---
 
@@ -180,8 +213,9 @@ python -m http.server 8000
 
 - ❌ 不要把演示直接写在根 `index.html` 里 —— 主页只负责列表和查看器。
 - ❌ 不要给 `demos.json` 里的条目用中文 `slug`，也不要把 `slug` 和目录名写成不一样。
-- ❌ 不要引用主站的 `/css/`、`/js/`、`/img/` —— `/demo/` 是主站的一部分，路径会串味，
-  而且仓库预览地址下会 404。
+- ❌ 不要引用主站的 `/css/`、`/js/`、`/img/` —— 演示跑在
+  `abitginger.top/WebDemos/demos/<slug>/`，写 `/css/` 会指到主站根目录去；
+  演示还会被 iframe 内嵌，路径更会串味。
 - ❌ 不要为了「好看」去动 `assets/hub.css` / `assets/hub.js` 的**既有行为**：
   这两个文件同时被主站首页引入，改错会让主站一起坏。
   要改就整体考虑，并在 PR / commit 里说明。
@@ -200,24 +234,30 @@ python -m http.server 8000
 
 ---
 
-## 5. 上线：让 `/demo/` 更新
+## 5. 上线
 
-`/demo/` 的内容由主站 `ABitGinger.github.io` 的
-`.github/workflows/static.yml` 在构建时同步（它会 clone 本仓库到 `demo/`）。
-所以本仓库推完代码后：
+**本仓库的 Pages 就是正式站点**（`abitginger.top/WebDemos/`），由
+`.github/workflows/pages.yml` 在 push 到 `main` 时部署，零构建。
 
-- **什么都不用做**：主站每小时定时构建一次，最迟 1 小时后 `/demo/` 就是最新的。
-- **想立刻生效**：去 `ABitGinger.github.io` 的 Actions 页面手动跑一次
-  「Deploy static content to Pages」；或者在本仓库配好 Secret
-  `HOMEPAGE_DISPATCH_TOKEN`（对主站仓库有 Actions 写权限的 PAT），
-  之后本仓库每次 push 都会自动触发主站重建。
+- **什么都不用做**：`git push` 到 `main`，约 1 分钟后线上就是最新的。
+- **看进度**：本仓库的 Actions → 「部署演示厅」。
+- **手动重跑**：Actions → 部署演示厅 → Run workflow。
+
+主站 `ABitGinger.github.io` 只做一件相关的事：它的首页 `<head>` 里预加载了
+`/WebDemos/assets/hub.css` 与 `/WebDemos/assets/hub.js`，好让首页点「🧪 演示厅」时
+能做同源静态跳转（只替换 `<main>`、不刷新页面，页眉页脚不动）。**所以改了这两个
+文件不需要去改主站**；但如果改的是「既有行为」，仍然要整体考虑（见第 3 节）。
+
+> 早先的 `/demo/` 方案是让主站构建时 clone 本仓库、复制进它自己的 `demo/` 目录，
+> 已废弃 —— 跨仓库复制纯属多余，现在两边各部署各的。主站 `static.yml` 里对应的
+> 同步步骤也已经删掉了。
 
 ---
 
 ## 6. 交活前的检查清单
 
 - [ ] `demos/<slug>/index.html` 存在，且整个文件夹自包含（无外部绝对路径）
-- [ ] 「返回演示厅」胶囊已加入，且 `href="../"`
+- [ ] 「返回演示厅」胶囊按第 3 步原样加入（`href="../../"` + 反推脚本，别只写 `../`）
 - [ ] `demos.json` 里新增了一条，`slug` 与目录名完全一致
 - [ ] `python scripts/check.py` 输出「检查通过」，0 错误
 - [ ] `python -m http.server` 起服务，在浏览器里点开、放大、独立打开、Esc 关闭都正常

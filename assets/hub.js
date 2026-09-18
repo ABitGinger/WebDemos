@@ -10,11 +10,11 @@
       以内嵌 <iframe> 打开演示；点「⤢ 独立打开」才跳转到独立页面。
 
    宿主适配：
-   · 既可以独立访问（/demo/），也可以被主站的「静默跳转」把 <main> 换进来。
-     后者只会替换 <main>、不会重新执行 <head> 里的脚本，所以本文件同时监听
-     DOMContentLoaded 与主站派发的 view:swapped 事件（与主站 js/repos.js 一致）。
-   · 所有路径都由本文件自身的 <script src> 反推，因此在
-     /demo/ 与仓库自有 Pages（/WebDemos/）下都能直接跑。
+   · 既可以独立访问（/WebDemos/），也可以被主站 ABitGinger.github.io 的「静默跳转」
+     把 <main> 换进来。后者只会替换 <main>、不会重新执行 <head> 里的脚本，所以本文件
+     同时监听 DOMContentLoaded 与主站派发的 view:swapped 事件（与主站 js/repos.js 一致）。
+   · 所有路径都由本文件自身的 <script src> 反推，所以挂到任何目录下都能直接跑，
+     以后换挂载点（比如想放 /demos/）不需要改这里。
    ========================================================================== */
 
 (function () {
@@ -30,7 +30,7 @@
         return null;
     })();
 
-    // 例：https://abitginger.github.io/demo/assets/hub.js  ->  /demo/
+    // 例：https://abitginger.top/WebDemos/assets/hub.js  ->  /WebDemos/
     var BASE = (function () {
         var src = (SELF && SELF.src) || '';
         if (src) return src.replace(/assets\/hub\.js.*$/, '');

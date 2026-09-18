@@ -1,10 +1,17 @@
-# 把演示厅部署到本仓库的 GitHub Pages（预览用）。
+# 演示厅的本体部署：本仓库自己的 GitHub Pages。
 #
-# 正式地址是主站的 https://abitginger.github.io/demo/ ，
-# 由主站 ABitGinger.github.io 的 static.yml 在构建时把本仓库同步进 demo/ 目录。
-# 这里额外部署一份，是为了在改动 WebDemos 时能立刻有个独立地址看效果，
-# 也方便把某一个演示单独分享出去（/WebDemos/demos/<slug>/）。
-name: 部署演示厅（仓库预览）
+# 对外地址：https://abitginger.top/WebDemos/
+#   （项目站点的路径固定等于仓库名；abitginger.github.io 是别名，会 301 过去）
+# 单个演示：https://abitginger.top/WebDemos/demos/<slug>/
+#
+# 零构建：仓库里的文件就是站点产物，直接上传整个仓库。
+# upload-pages-artifact 会自动排除 .git、.github 以及根目录下所有点开头的文件，
+# 所以工作流和 .gitignore 不会出现在站点上（README.md / ADDEMO.md / scripts/ 会，
+# 但仓库本来就是公开的，无所谓）。
+#
+# 首次部署：仓库 Settings → Pages → Source 选 GitHub Actions；
+# 下面的 configure-pages 带 enablement: true，通常能自动打开。
+name: 部署演示厅
 
 on:
   push:
@@ -17,7 +24,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "webdemos-pages"
+  group: "pages"
   cancel-in-progress: false
 
 jobs:
