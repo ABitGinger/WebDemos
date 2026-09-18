@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>自习课噪音模拟器</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:#05080f;color:#e2e8f0;min-height:100vh;
+    display:flex;align-items:center;justify-content:center;padding:16px;
+  }
+  .wrap{width:100%;max-width:1300px;display:grid;grid-template-columns:1fr 306px;gap:16px}
+  @media(max-width:880px){.wrap{grid-template-columns:1fr}}
+
+  .stage{
+    position:relative;border-radius:18px;overflow:hidden;
+    background:#080d18;border:1px solid #16202f;
+    aspect-ratio:16/9;
+    box-shadow:0 30px 80px -30px rgba(0,0,0,.9), inset 0 0 0 1px rgba(255,255,255,.02);
+  }
+  canvas#scene{width:100%;height:100%;display:block}
+
+  .badge{
+    position:absolute;top:14px;left:14px;
+    display:flex;align-items:center;gap:7px;
+    padding:6px 12px;border-radius:999px;
+    background:rgba(15,23,42,.75);backdrop-filter:blur(10px);
+    border:1px solid rgba(148,163,184,.18);
+    font-size:12px;font-weight:600;color:#94a3b8;
+    transition:.3s;
+  }
+  .badge .dot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;transition:.3s}
+  .badge.away .dot{background:#64748b;box-shadow:none}
+  .badge.away{color:#64748b}
+
+  .flash{
+    position:absolute;inset:0;pointer-events:none;opacity:0;
+    background:radial-gradient(ellipse at 50% -10%, rgba(239,68,68,.85), rgba(239,68,68,.25) 45%, transparent 70%);
+  }
+
+  .panel{display:flex;flex-direction:column;gap:12px}
+  .card{
+    background:linear-gradient(180deg,#0d1524,#0a111d);
+    border:1px solid #16202f;border-radius:16px;padding:14px;
+  }
+
+  .meter-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+  .meter-head .label{font-size:12px;color:#64748b;font-weight:600;letter-spacing:.5px}
+  .meter-head .db{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;color:#f59e0b}
+  .meter{height:9px;background:#131d2e;border-radius:6px;overflow:hidden}
+  .meter-fill{height:100%;width:0%;border-radius:6px;background:#22c55e;transition:width .08s linear}
+  #graph{width:100%;height:auto;display:block;margin-top:10px;border-radius:8px}
+  .status{
+    margin-top:8px;font-size:13px;font-weight:600;color:#94a3b8;
+    text-align:center;transition:color .3s;
+  }
+  .status.sudden{color:#fbbf24;animation:pulse .6s ease-in-out 2}
+  @keyframes pulse{50%{opacity:.45}}
+
+  .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
+  .row label{font-size:12px;color:#94a3b8;font-weight:600}
+  .row .val{font-size:12px;color:#f59e0b;font-weight:700;font-variant-numeric:tabular-nums}
+
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:4px;
+    border-radius:3px;background:#1b2739;outline:none;margin:9px 0 15px;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:#f59e0b;cursor:pointer;
+    box-shadow:0 0 0 3px rgba(245,158,11,.16),0 2px 6px rgba(0,0,0,.5);
+    transition:box-shadow .15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{box-shadow:0 0 0 6px rgba(245,158,11,.22),0 2px 6px rgba(0,0,0,.5)}
+  input[type=range]::-moz-range-thumb{
+    width:15px;height:15px;border:none;border-radius:50%;background:#f59e0b;cursor:pointer;
+  }
+  .card input[type=range]:last-child{margin-bottom:0}
+
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .btn{
+    padding:11px 10px;border-radius:11px;border:1px solid #24344a;
+    background:#131e2f;color:#cbd5e1;font-size:13px;font-weight:700;
+    cursor:pointer;transition:.15s;font-family:inherit;
+  }
+  .btn:hover{background:#1b2a40;border-color:#33475f}
+  .btn:active{transform:scale(.97)}
+  .btn.danger{
+    grid-column:1/-1;
+    background:linear-gradient(180deg,#ef4444,#b91c1c);
+    border-color:#991b1b;color:#fff;
+    box-shadow:0 6px 22px -6px rgba(239,68,68,.7);
+  }
+  .btn.danger:hover{background:linear-gradient(180deg,#f87171,#dc2626)}
+  .btn.danger:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;transform:none}
+  .btn.wide{grid-column:1/-1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage" id="stage">
+    <canvas id="scene"></canvas>
+    <div class="badge" id="badge"><span class="dot"></span><span id="badgeText">老师在场</span></div>
+    <div class="flash" id="flash"></div>
+  </div>
+
+  <aside class="panel">
+    <div class="card">
+      <div class="meter-head">
+        <span class="label">教室噪音</span>
+        <span class="db" id="dbVal">-- dB</span>
+      </div>
+      <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
+      <canvas id="graph" width="600" height="120"></canvas>
+      <div class="status" id="status">正在初始化…</div>
+    </div>
+
+    <div class="card">
+      <div class="row"><label>老师气场</label><span class="val" id="val-aura">45</span></div>
+      <input type="range" id="aura" min="0" max="100" value="45">
+
+      <div class="row"><label>老师性格 · 温和 ↔ 严厉</label><span class="val" id="val-strict">55</span></div>
+      <input type="range" id="strict" min="0" max="100" value="55">
+
+      <div class="row"><label>学生活跃度</label><span class="val" id="val-activity">50</span></div>
+      <input type="range" id="activity" min="0" max="100" value="50">
+
+      <div class="row"><label>从众心理（传染性）</label><span class="val" id="val-social">65</span></div>
+      <input type="range" id="social" min="0" max="100" value="65">
+
+      <div class="row"><label>随机扰动（自发涨落）</label><span class="val" id="val-noise">35</span></div>
+      <input type="range" id="noise" min="0" max="100" value="35">
+    </div>
+
+    <div class="btns">
+      <button class="btn danger" id="btnAnger">老师发怒</button>
+      <button class="btn" id="btnLeave">老师离开</button>
+      <button class="btn" id="btnReset">重置</button>
+      <button class="btn wide" id="btnSound">🔇 声音：关</button>
+    </div>
+  </aside>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+/* ============ 基础常量 ============ */
+const COLS = 28, ROWS = 16, N = COLS * ROWS;
+const FLIP_RATE = 2.5;          // 状态翻转速率
+const HIST_LEN  = 240;          // 噪音曲线缓存长度
+
+/* ============ 学生状态 ============ */
+const state  = new Float32Array(N);   // 0 = 安静, 1 = 说话
+const visual = new Float32Array(N);   // 平滑后的视觉值
+const trait  = new Float32Array(N);   // 个人外向度
+const offX   = new Float32Array(N);
+const offY   = new Float32Array(N);
+const order  = new Uint16Array(N);
+
+for (let i = 0; i < N; i++) {
+  trait[i]  = Math.random();
+  state[i]  = Math.random() < 0.45 ? 1 : 0;
+  visual[i] = state[i];
+  offX[i]   = (Math.random() - 0.5) * 0.14;
+  offY[i]   = (Math.random() - 0.5) * 0.14;
+  order[i]  = i;
+}
+
+/* ============ 参数 ============ */
+const params = {
+  aura: 45,
+  strict: 55,
+  activity: 50,
+  social: 65,
+  noise: 35,
+  teacherPresent: true
+};
+
+let anger = 0;          // 怒气脉冲 0~2.2
+let cooldown = 0;
+let talkingCount = 0;
+let paused = false;
+
+/* ============ DOM ============ */
+const stage     = document.getElementById('stage');
+const canvas    = document.getElementById('scene');
+const ctx       = canvas.getContext('2d');
+const flashEl   = document.getElementById('flash');
+const badge     = document.getElementById('badge');
+const badgeText = document.getElementById('badgeText');
+const dbVal     = document.getElementById('dbVal');
+const meterFill = document.getElementById('meterFill');
+const statusEl  = document.getElementById('status');
+const gcanvas   = document.getElementById('graph');
+const gctx      = gcanvas.getContext('2d');
+
+/* ============ 布局 ============ */
+let W = 800, H = 450, CELL = 24, OX = 0, OY = 0, RAD = 8;
+
+function resize() {
+  const rect = stage.getBoundingClientRect();
+  if (rect.width < 10 || rect.height < 10) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = rect.width; H = rect.height;
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const pad = 12;
+  CELL = Math.min((W - pad * 2) / COLS, (H - pad * 2) / ROWS);
+  OX = (W - CELL * COLS) / 2;
+  OY = (H - CELL * ROWS) / 2;
+  RAD = CELL * 0.34;
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+/* ============ 颜色缓存 ============ */
+const LEVELS = 32;
+const COLORS = [];
+for (let i = 0; i <= LEVELS; i++) {
+  const v = i / LEVELS;
+  COLORS.push('rgb(' + ((45 + v * 206) | 0) + ',' +
+                       ((58 + v * 88)  | 0) + ',' +
+                       ((80 - v * 20)  | 0) + ')');
+}
+
+/* ============ 洗牌 ============ */
+function shuffle() {
+  for (let i = N - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    const t = order[i]; order[i] = order[j]; order[j] = t;
+  }
+}
+
+/* ============ 核心模拟 ============ */
+function simulate(dt) {
+  const aura   = params.teacherPresent ? params.aura / 100 : 0;
+  const strict = params.strict / 100;
+
+  const socialW = params.social / 100 * 3.2;
+  const actW    = params.activity / 100 * 2.4 - 0.8;
+  const noiseW  = params.noise / 100 * 2.8;
+
+  // 老师压制场
+  const suppress = aura * (1.0 + strict * 2.0) + anger * (1.5 + strict * 1.5);
+
+  const rate = FLIP_RATE * dt;
+  let talking = 0;
+
+  shuffle();
+
+  for (let k = 0; k < N; k++) {
+    const i = order[k];
+    const r = (i / COLS) | 0;
+    const c = i - r * COLS;
+
+    // 邻居平均
+    let sum = 0, cnt = 0;
+    const r0 = r > 0 ? -1 : 0, r1 = r < ROWS - 1 ? 1 : 0;
+    const c0 = c > 0 ? -1 : 0, c1 = c < COLS - 1 ? 1 : 0;
+    for (let dr = r0; dr <= r1; dr++) {
+      const base = (r + dr) * COLS;
+      for (let dc = c0; dc <= c1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        sum += state[base + c + dc];
+        cnt++;
+      }
+    }
+    const nb = sum / cnt;
+
+    const field =
+      socialW * (2 * nb - 1) +
+      1.1 * (2 * trait[i] - 1) +
+      actW - suppress +
+      (Math.random() * 2 - 1) * noiseW;
+
+    const p = 1 / (1 + Math.exp(-field));
+
+    if (state[i] > 0.5) {
+      if (Math.random() < (1 - p) * rate) state[i] = 0;
+    } else {
+      if (Math.random() < p * rate) state[i] = 1;
+    }
+    if (state[i] > 0.5) talking++;
+  }
+
+  talkingCount = talking;
+}
+
+/* ============ 绘制 ============ */
+function render() {
+  // 背景
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0a1120');
+  bg.addColorStop(1, '#05080f');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  for (let r = 0; r < ROWS; r++) {
+    const base = r * COLS;
+    const cy0 = OY + (r + 0.5) * CELL;
+    for (let c = 0; c < COLS; c++) {
+      const i = base + c;
+      const v = visual[i];
+      ctx.fillStyle = COLORS[(v * LEVELS) | 0];
+      const cx = OX + (c + 0.5) * CELL + offX[i] * CELL;
+      const cy = cy0 + offY[i] * CELL;
+      const rr = RAD * (0.72 + 0.4 * v);
+      ctx.beginPath();
+      ctx.arc(cx, cy, rr, 0, 6.2832);
+      ctx.fill();
+    }
+  }
+}
+
+/* ============ 噪音曲线 ============ */
+const hist = new Float32Array(HIST_LEN);
+let histHead = 0;
+
+function drawGraph() {
+  const w = gcanvas.width, h = gcanvas.height;
+  gctx.clearRect(0, 0, w, h);
+
+  // 网格
+  gctx.strokeStyle = 'rgba(148,163,184,0.07)';
+  gctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    const y = Math.round((h / 4) * i) + 0.5;
+    gctx.beginPath(); gctx.moveTo(0, y); gctx.lineTo(w, y); gctx.stroke();
+  }
+
+  // 面积
+  gctx.beginPath();
+  gctx.moveTo(0, h);
+  for (let i = 0; i < HIST_LEN; i++) {
+    const v = hist[(histHead + i) % HIST_LEN];
+    gctx.lineTo((i / (HIST_LEN - 1)) * w, h - v * h * 0.95);
+  }
+  gctx.lineTo(w, h);
+  gctx.closePath();
+  const grad = gctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(245,158,11,0.30)');
+  grad.addColorStop(1, 'rgba(245,158,11,0)');
+  gctx.fillStyle = grad;
+  gctx.fill();
+
+  // 线
+  gctx.beginPath();
+  for (let i = 0; i < HIST_LEN; i++) {
+    const v = hist[(histHead + i) % HIST_LEN];
+    const x = (i / (HIST_LEN - 1)) * w;
+    const y = h - v * h * 0.95;
+    i ? gctx.lineTo(x, y) : gctx.moveTo(x, y);
+  }
+  gctx.strokeStyle = '#f59e0b';
+  gctx.lineWidth = 2;
+  gctx.lineJoin = 'round';
+  gctx.stroke();
+}
+
+/* ============ 状态文本 ============ */
+function statusText(l) {
+  if (l < 0.05) return '🤫 鸦雀无声';
+  if (l < 0.18) return '😐 很安静，只有零星翻书声';
+  if (l < 0.35) return '🤔 偶尔有窃窃私语';
+  if (l < 0.55) return '💬 有些嘈杂了';
+  if (l < 0.75) return '🗣️ 挺吵的';
+  return '🔥 教室炸锅了';
+}
+
+let uiAccum = 0;
+let suddenTimer = 0;
+let prevLevel = 0;
+let levelSnapshot = 0, snapshotTimer = 0;
+
+function updateUI(dt) {
+  uiAccum += dt;
+  if (uiAccum < 0.05) return;
+  const step = uiAccum;
+  uiAccum = 0;
+
+  const level = talkingCount / N;
+
+  // 写入曲线
+  hist[histHead] = level;
+  histHead = (histHead + 1) % HIST_LEN;
+  drawGraph();
+
+  // 分贝与进度条
+  const db = 30 + level * 42;
+  dbVal.textContent = Math.round(db) + ' dB';
+  meterFill.style.width = (level * 100).toFixed(1) + '%';
+  meterFill.style.background = 'hsl(' + (140 - level * 140).toFixed(0) + ',85%,55%)';
+
+  // 突然安静检测
+  snapshotTimer += step;
+  if (snapshotTimer >= 0.45) {
+    if (suddenTimer <= 0 && levelSnapshot - level > 0.28 && level < 0.5) {
+      suddenTimer = 2.2;
+      statusEl.textContent = '😳 教室突然安静了…';
+      statusEl.classList.add('sudden');
+    }
+    levelSnapshot = level;
+    snapshotTimer = 0;
+  }
+
+  if (suddenTimer > 0) {
+    suddenTimer -= step;
+    if (suddenTimer <= 0) {
+      statusEl.textContent = statusText(level);
+      statusEl.classList.remove('sudden');
+    }
+  } else {
+    statusEl.textContent = statusText(level);
+    if (statusEl.classList.contains('sudden')) statusEl.classList.remove('sudden');
+  }
+
+  prevLevel = level;
+
+  // 声音
+  if (audio.on && audio.gain) {
+    audio.gain.gain.setTargetAtTime(level * 0.14, audio.ctx.currentTime, 0.09);
+  }
+}
+
+/* ============ 主循环 ============ */
+let prevTime = performance.now();
+
+function frame(now) {
+  let dt = (now - prevTime) / 1000;
+  prevTime = now;
+  if (dt > 0.05) dt = 0.05;
+  if (dt < 0) dt = 0;
+
+  if (!paused) {
+    simulate(dt);
+
+    const strict = params.strict / 100;
+    const decay = 1.1 - strict * 0.6;   // 严厉的老师怒气持续更久
+    anger = Math.max(0, anger - decay * dt);
+    cooldown = Math.max(0, cooldown - dt);
+
+    if (cooldown <= 0) btnAnger.disabled = false;
+  }
+
+  const k = Math.min(1, dt * 14);
+  for (let i = 0; i < N; i++) {
+    visual[i] += ((state[i] > 0.5 ? 1 : 0) - visual[i]) * k;
+  }
+
+  render();
+  updateUI(dt);
+  requestAnimationFrame(frame);
+}
+
+/* ============ 音频 ============ */
+const audio = { ctx: null, gain: null, on: false };
+
+function initAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  audio.ctx = new AC();
+
+  const len = audio.ctx.sampleRate * 2;
+  const buf = audio.ctx.createBuffer(1, len, audio.ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+
+  const src = audio.ctx.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+
+  const filter = audio.ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 620;
+  filter.Q.value = 0.7;
+
+  audio.gain = audio.ctx.createGain();
+  audio.gain.gain.value = 0;
+
+  src.connect(filter).connect(audio.gain).connect(audio.ctx.destination);
+  src.start();
+}
+
+/* ============ 交互 ============ */
+const btnAnger  = document.getElementById('btnAnger');
+const btnLeave  = document.getElementById('btnLeave');
+const btnReset  = document.getElementById('btnReset');
+const btnSound  = document.getElementById('btnSound');
+
+// 滑块
+[['aura','aura'],['strict','strict'],['activity','activity'],['social','social'],['noise','noise']]
+.forEach(function (pair) {
+  const el = document.getElementById(pair[0]);
+  const out = document.getElementById('val-' + pair[0]);
+  out.textContent = el.value;
+  el.addEventListener('input', function () {
+    params[pair[1]] = +el.value;
+    out.textContent = el.value;
+  });
+});
+
+// 老师发怒
+btnAnger.addEventListener('click', function () {
+  if (cooldown > 0) return;
+  anger = Math.min(2.4, anger + 2.1);
+  cooldown = 1.2;
+  btnAnger.disabled = true;
+
+  // 闪光
+  flashEl.style.transition = 'none';
+  flashEl.style.opacity = '0.9';
+  requestAnimationFrame(function () {
+    flashEl.style.transition = 'opacity .7s ease-out';
+    flashEl.style.opacity = '0';
+  });
+
+  statusEl.textContent = '😠 老师发怒了！全班瞬间安静…';
+  statusEl.classList.add('sudden');
+  suddenTimer = 2.0;
+
+  // 检查老师是否在场
+  if (!params.teacherPresent) {
+    statusEl.textContent = '（老师不在教室，没人理他…）';
+  }
+});
+
+// 老师离开 / 回来
+btnLeave.addEventListener('click', function () {
+  params.teacherPresent = !params.teacherPresent;
+  if (params.teacherPresent) {
+    btnLeave.textContent = '老师离开';
+    badgeText.textContent = '老师在场';
+    badge.classList.remove('away');
+  } else {
+    btnLeave.textContent = '老师回来';
+    badgeText.textContent = '老师不在';
+    badge.classList.add('away');
+  }
+});
+
+// 重置
+btnReset.addEventListener('click', function () {
+  for (let i = 0; i < N; i++) {
+    trait[i]  = Math.random();
+    state[i]  = Math.random() < 0.45 ? 1 : 0;
+    visual[i] = state[i];
+  }
+  anger = 0;
+  cooldown = 0;
+  btnAnger.disabled = false;
+  hist.fill(0);
+  histHead = 0;
+  levelSnapshot = 0;
+  snapshotTimer = 0;
+  suddenTimer = 0;
+  statusEl.textContent = '正在上课…';
+  statusEl.classList.remove('sudden');
+});
+
+// 声音
+btnSound.addEventListener('click', function () {
+  if (!audio.ctx) initAudio();
+  if (!audio.ctx) return;
+
+  audio.on = !audio.on;
+  if (audio.ctx.state === 'suspended') audio.ctx.resume();
+
+  if (audio.on) {
+    btnSound.textContent = '🔊 声音：开';
+  } else {
+    btnSound.textContent = '🔇 声音：关';
+    audio.gain.gain.setTargetAtTime(0, audio.ctx.currentTime, 0.05);
+  }
+});
+
+/* ============ 启动 ============ */
+requestAnimationFrame(frame);
+
+})();
+</script>
+
+<!-- ↓↓↓ 演示厅 SDK：独立访问时提供「返回演示厅」入口；被演示厅内嵌（iframe）时自动隐藏 -->
+<a id="wb-back" href="../" title="返回演示厅">← 演示厅</a>
+<script>(function(){if(window.self!==window.top){var e=document.getElementById('wb-back');if(e)e.parentNode.removeChild(e);}})();</script>
+<style>
+#wb-back{position:fixed;left:12px;bottom:12px;z-index:2147483000;display:inline-flex;align-items:center;
+  padding:6px 13px;border-radius:999px;text-decoration:none;color:#fff;opacity:.42;
+  font:600 12px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Arial,sans-serif;
+  background:rgba(0,0,0,.5);border:1px solid rgba(223,182,95,.6);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  transition:opacity .25s ease,transform .25s ease}
+#wb-back:hover{opacity:1;transform:translateY(-1px)}
+</style>
+<!-- ↑↑↑ 演示厅 SDK 结束 -->
+</body>
+</html>

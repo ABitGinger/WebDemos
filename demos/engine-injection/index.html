@@ -1,0 +1,1877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>发动机喷油与燃烧 3D 交互演示 · Pro</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#05070a;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    color:#dbe4f0;-webkit-font-smoothing:antialiased}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+
+  .panel{
+    position:fixed;top:18px;width:290px;max-height:calc(100vh - 36px);
+    background:rgba(12,18,28,.78);backdrop-filter:blur(18px) saturate(1.4);
+    -webkit-backdrop-filter:blur(18px) saturate(1.4);
+    border:1px solid rgba(90,160,255,.14);border-radius:16px;
+    box-shadow:0 18px 50px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05);
+    padding:16px 16px 14px;overflow-y:auto;overflow-x:hidden;
+    scrollbar-width:thin;scrollbar-color:rgba(90,160,255,.3) transparent;
+    z-index:10;
+  }
+  .panel::-webkit-scrollbar{width:5px}
+  .panel::-webkit-scrollbar-thumb{background:rgba(90,160,255,.3);border-radius:3px}
+  .panel.left{left:18px}
+  .panel.right{right:18px;width:322px}
+
+  .title{font-size:13px;font-weight:600;letter-spacing:.08em;color:#7fb4ff;
+    text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .title::before{content:"";width:3px;height:14px;border-radius:2px;
+    background:linear-gradient(180deg,#4da3ff,#1c6dd0);box-shadow:0 0 10px rgba(77,163,255,.7)}
+
+  /* ---------- 控制项 ---------- */
+  .ctrl{margin-bottom:13px}
+  .ctrl-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .ctrl-label{font-size:12px;color:#9fb0c6;letter-spacing:.02em}
+  .ctrl-val{font-size:12px;font-weight:600;color:#5fd0ff;font-variant-numeric:tabular-nums;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .ctrl-val.amber{color:#ffb454}
+  .ctrl-val.green{color:#5dffb0}
+
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;
+    background:linear-gradient(90deg,rgba(77,163,255,.55),rgba(77,163,255,.12));
+    outline:none;cursor:pointer;transition:opacity .2s
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:15px;height:15px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#bfe4ff,#3d8fe8 65%,#1a5aa8);
+    border:1.5px solid rgba(180,225,255,.85);
+    box-shadow:0 0 12px rgba(77,163,255,.85),0 2px 6px rgba(0,0,0,.5);
+    transition:transform .12s ease
+  }
+  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2)}
+  input[type=range]::-webkit-slider-thumb:active{transform:scale(1.05)}
+  input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;border:1.5px solid rgba(180,225,255,.85);
+    background:radial-gradient(circle at 35% 30%,#bfe4ff,#3d8fe8 65%,#1a5aa8);
+    box-shadow:0 0 12px rgba(77,163,255,.85);cursor:pointer
+  }
+
+  .seg{display:flex;gap:5px;background:rgba(0,0,0,.3);padding:4px;border-radius:10px;
+    border:1px solid rgba(90,160,255,.12)}
+  .seg button{
+    flex:1;padding:7px 4px;border:none;border-radius:7px;background:transparent;
+    color:#8fa3bd;font-size:11.5px;font-weight:600;cursor:pointer;letter-spacing:.03em;
+    transition:all .18s ease;font-family:inherit
+  }
+  .seg button.active{
+    background:linear-gradient(180deg,rgba(77,163,255,.35),rgba(40,110,210,.25));
+    color:#c8e8ff;box-shadow:0 0 14px rgba(77,163,255,.3),inset 0 1px 0 rgba(255,255,255,.15)
+  }
+  .seg button:hover:not(.active){color:#bcd4ee;background:rgba(77,163,255,.08)}
+
+  .divider{height:1px;background:linear-gradient(90deg,transparent,rgba(90,160,255,.2),transparent);
+    margin:14px 0 13px}
+
+  /* ---------- 数据面板 ---------- */
+  .readout-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .ro{background:rgba(0,0,0,.28);border:1px solid rgba(90,160,255,.1);border-radius:10px;
+    padding:8px 9px;position:relative;overflow:hidden}
+  .ro::after{content:"";position:absolute;top:0;left:0;width:2px;height:100%;
+    background:linear-gradient(180deg,#4da3ff,transparent)}
+  .ro .k{font-size:10px;color:#7b8fa8;letter-spacing:.04em;margin-bottom:3px;white-space:nowrap}
+  .ro .v{font-size:15px;font-weight:600;color:#dff0ff;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;
+    line-height:1.1}
+  .ro .v small{font-size:10px;color:#7b8fa8;font-weight:400;margin-left:2px}
+
+  .stroke-badge{
+    grid-column:span 2;display:flex;align-items:center;justify-content:space-between;
+    padding:9px 12px;border-radius:10px;
+    background:linear-gradient(90deg,rgba(77,163,255,.16),rgba(77,163,255,.02));
+    border:1px solid rgba(90,160,255,.2)
+  }
+  .stroke-badge .lbl{font-size:11px;color:#8fa3bd;letter-spacing:.05em}
+  .stroke-badge .st{font-size:16px;font-weight:700;color:#5fd0ff;letter-spacing:.1em;
+    text-shadow:0 0 14px rgba(95,208,255,.6)}
+  .stroke-badge .ang{font-size:12px;color:#b7cbe2;
+    font-family:ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+  /* ---------- 选项卡 ---------- */
+  .tabbar{display:flex;gap:4px;background:rgba(0,0,0,.35);padding:4px;
+    border-radius:11px;border:1px solid rgba(90,160,255,.12);margin-bottom:14px}
+  .tabbar button{flex:1;padding:8px 4px;border:none;border-radius:8px;background:transparent;
+    color:#7b8fa8;font-size:11.5px;font-weight:600;cursor:pointer;letter-spacing:.03em;
+    transition:all .18s ease;font-family:inherit;white-space:nowrap}
+  .tabbar button.active{
+    background:linear-gradient(180deg,rgba(77,163,255,.32),rgba(40,110,210,.2));
+    color:#c8e8ff;box-shadow:0 0 14px rgba(77,163,255,.25),inset 0 1px 0 rgba(255,255,255,.12)
+  }
+  .tabbar button:hover:not(.active){color:#bcd4ee;background:rgba(77,163,255,.07)}
+  .tabpane.hidden{display:none}
+
+  /* ---------- 图表 ---------- */
+  #chart,#perfChart{width:100%;height:138px;display:block;border-radius:10px;
+    background:rgba(0,0,0,.3);border:1px solid rgba(90,160,255,.1)}
+  #perfChart{height:168px}
+
+  .legend{display:flex;gap:14px;margin-top:8px;font-size:10px;color:#7b8fa8;flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .legend i{width:12px;height:2.5px;border-radius:2px;display:inline-block}
+
+  .btn-row{display:flex;gap:8px;margin-top:12px}
+  .btn{
+    flex:1;padding:9px;border-radius:10px;border:1px solid rgba(90,160,255,.22);
+    background:rgba(77,163,255,.1);color:#a8d4ff;font-size:12px;font-weight:600;
+    cursor:pointer;transition:all .18s ease;font-family:inherit;letter-spacing:.03em
+  }
+  .btn:hover{background:rgba(77,163,255,.22);border-color:rgba(90,160,255,.45);
+    box-shadow:0 0 18px rgba(77,163,255,.22)}
+  .btn:active{transform:scale(.97)}
+
+  .hint{font-size:10.5px;color:#5f7290;line-height:1.6;margin-top:10px;
+    padding:8px 10px;border-radius:8px;background:rgba(77,163,255,.05);
+    border-left:2px solid rgba(77,163,255,.3)}
+
+  .rpm-fixed{font-size:10.5px;color:#7b8fa8;margin-bottom:12px;padding:7px 10px;
+    border-radius:8px;background:rgba(0,0,0,.25);border:1px solid rgba(90,160,255,.08);
+    display:flex;justify-content:space-between;align-items:center}
+  .rpm-fixed b{color:#5fd0ff;font-family:ui-monospace,monospace;font-size:12px;font-weight:600}
+
+  @media(max-width:1080px){
+    .panel{width:256px}
+    .panel.right{width:286px}
+  }
+  @media(max-width:860px){
+    .panel.left{width:calc(100% - 36px);max-height:44vh}
+    .panel.right{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- ============ 左侧控制面板 ============ -->
+<div class="panel left">
+  <div class="title">控制参数</div>
+
+  <div class="rpm-fixed">
+    <span>固定转速（用于演示）</span>
+    <b>3000 rpm</b>
+  </div>
+
+  <div class="ctrl">
+    <div class="ctrl-head"><span class="ctrl-label">喷射模式</span></div>
+    <div class="seg" id="modeSeg">
+      <button data-mode="GDI" class="active">缸内直喷 GDI</button>
+      <button data-mode="PFI">进气道 PFI</button>
+    </div>
+  </div>
+
+  <div class="ctrl">
+    <div class="ctrl-head"><span class="ctrl-label">节气门开度</span><span class="ctrl-val" id="v-thr">60 <small>%</small></span></div>
+    <input type="range" id="thr" min="5" max="100" step="1" value="60">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="ctrl">
+    <div class="ctrl-head"><span class="ctrl-label" id="injTimingLabel">喷油正时 (BTDC)</span><span class="ctrl-val amber" id="v-injT">70 <small>°</small></span></div>
+    <input type="range" id="injT" min="10" max="180" step="1" value="70">
+  </div>
+
+  <div class="ctrl">
+    <div class="ctrl-head"><span class="ctrl-label">喷油脉宽</span><span class="ctrl-val amber" id="v-pw">1.30 <small>ms</small></span></div>
+    <input type="range" id="pw" min="0.2" max="5" step="0.05" value="1.3">
+  </div>
+
+  <div class="ctrl">
+    <div class="ctrl-head"><span class="ctrl-label">燃油喷射压力</span><span class="ctrl-val amber" id="v-rp">150 <small>bar</small></span></div>
+    <input type="range" id="rp" min="30" max="300" step="5" value="150">
+  </div>
+
+  <div class="ctrl">
+    <div class="ctrl-head"><span class="ctrl-label">点火提前角</span><span class="ctrl-val amber" id="v-sp">25 <small>°</small></span></div>
+    <input type="range" id="sp" min="5" max="45" step="1" value="25">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="ctrl">
+    <div class="ctrl-head"><span class="ctrl-label">播放倍速</span><span class="ctrl-val green" id="v-ps">0.06 <small>×</small></span></div>
+    <input type="range" id="ps" min="0.01" max="0.5" step="0.005" value="0.06">
+  </div>
+
+  <div class="ctrl">
+    <div class="ctrl-head"><span class="ctrl-label">手动曲轴角</span><span class="ctrl-val" id="v-ca">0 <small>°</small></span></div>
+    <input type="range" id="ca" min="0" max="720" step="1" value="0">
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" id="btnPlay">⏸ 暂停</button>
+    <button class="btn" id="btnReset">↺ 重置视角</button>
+  </div>
+
+  <div class="hint" id="hintText">
+    拖动鼠标旋转视角 · 滚轮缩放 · 右键平移
+  </div>
+</div>
+
+<!-- ============ 右侧数据面板 ============ -->
+<div class="panel right">
+  <div class="tabbar" id="tabbar">
+    <button data-tab="live" class="active">实时监测</button>
+    <button data-tab="perf">外特性曲线</button>
+    <button data-tab="about">说明</button>
+  </div>
+
+  <!-- ===== 实时监测 ===== -->
+  <div class="tabpane" id="pane-live">
+    <div class="readout-grid">
+      <div class="stroke-badge">
+        <span class="lbl">当前冲程</span>
+        <span class="st" id="d-stroke">进气</span>
+        <span class="ang" id="d-angle">0.0°</span>
+      </div>
+
+      <div class="ro"><div class="k">缸内压力</div><div class="v" id="d-press">1.0<small>bar</small></div></div>
+      <div class="ro"><div class="k">缸内温度</div><div class="v" id="d-temp">300<small>K</small></div></div>
+      <div class="ro"><div class="k">空燃比 AFR</div><div class="v" id="d-afr">14.7</div></div>
+      <div class="ro"><div class="k">过量空气系数 λ</div><div class="v" id="d-lam">1.00</div></div>
+      <div class="ro"><div class="k">循环喷油量</div><div class="v" id="d-fuel">0<small>mg</small></div></div>
+      <div class="ro"><div class="k">喷油持续角</div><div class="v" id="d-injdur">0<small>°CA</small></div></div>
+      <div class="ro"><div class="k">指示功率</div><div class="v" id="d-power">0<small>kW</small></div></div>
+      <div class="ro"><div class="k">指示扭矩</div><div class="v" id="d-torque">0<small>N·m</small></div></div>
+      <div class="ro"><div class="k">指示热效率</div><div class="v" id="d-eff">0<small>%</small></div></div>
+      <div class="ro"><div class="k">平均指示压力 IMEP</div><div class="v" id="d-imep">0<small>bar</small></div></div>
+    </div>
+
+    <div class="title" style="margin-top:4px">缸压 - 曲轴转角图</div>
+    <canvas id="chart"></canvas>
+    <div class="legend">
+      <span><i style="background:#4da3ff"></i>缸内压力</span>
+      <span><i style="background:#ffb454"></i>放热率</span>
+      <span><i style="background:#5dffb0"></i>喷油窗口</span>
+    </div>
+  </div>
+
+  <!-- ===== 外特性曲线 ===== -->
+  <div class="tabpane hidden" id="pane-perf">
+    <div class="title" style="margin-top:0">外特性曲线（WOT 全负荷）</div>
+    <canvas id="perfChart"></canvas>
+    <div class="legend">
+      <span><i style="background:#ff6b9d"></i>功率 kW</span>
+      <span><i style="background:#ffb454"></i>扭矩 N·m</span>
+      <span><i style="background:#5dffb0"></i>热效率 %</span>
+    </div>
+
+    <div class="readout-grid" style="margin-top:12px">
+      <div class="ro"><div class="k">最大功率</div><div class="v" id="p-pmax">--<small>kW</small></div></div>
+      <div class="ro"><div class="k">最大扭矩</div><div class="v" id="p-tmax">--<small>N·m</small></div></div>
+      <div class="ro"><div class="k">最大热效率</div><div class="v" id="p-emax">--<small>%</small></div></div>
+      <div class="ro"><div class="k">最高 IMEP</div><div class="v" id="p-imax">--<small>bar</small></div></div>
+    </div>
+
+    <div class="hint">
+      外特性曲线在节气门全开（WOT）、各转速下均采用理论最佳喷油量计算，
+      反映该发动机在当前喷射模式与喷射压力下的极限动力表现。
+    </div>
+  </div>
+
+  <!-- ===== 说明 ===== -->
+  <div class="tabpane hidden" id="pane-about">
+    <div class="title" style="margin-top:0">模型说明</div>
+    <div class="hint" style="border-left-color:#5dffb0">
+      <b style="color:#a8d4ff">热力学模型</b><br>
+      采用单区准维模型，基于 Wiebe 放热函数与理想气体状态方程，
+      结合容积变化率与气门流动松弛项进行曲轴转角步进积分。
+    </div>
+    <div class="hint" style="border-left-color:#ffb454">
+      <b style="color:#ffb454">喷射模型</b><br>
+      基于伯努利孔口流量方程计算喷油质量，考虑轨压、脉宽与喷嘴有效流通面积。
+      缸内直喷（GDI）需计算喷油结束到点火之间的混合时间，混合质量影响燃烧效率。
+    </div>
+    <div class="hint" style="border-left-color:#ff6b9d">
+      <b style="color:#ff6b9d">燃烧模型</b><br>
+      燃烧效率 = 空燃比高斯效率 × 雾化质量 × 混合气准备质量。
+      当 λ &gt; 1.9 或 λ &lt; 0.45 时判定为失火。
+    </div>
+    <div class="hint" style="border-left-color:#7fb4ff">
+      <b style="color:#7fb4ff">专业结构</b><br>
+      缸内直喷喷油器位于燃烧室中央，进气道喷射则位于进气道。
+      模型包含活塞（含凹坑）、连杆、曲轴（含配重）、气门组、气道等结构。
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ==================================================================
+   1. 全局配置
+   ================================================================== */
+const RPM_FIXED = 3000;
+
+const CFG = {
+  throttle: 0.60,
+  pulseWidth: 1.30,
+  railPressure: 150,
+  sparkBTDC: 25,
+  injTiming: 70,
+  mode: 'GDI',
+  playSpeed: 0.06,
+  paused: false,
+  manualCA: 0,
+  manualMode: false
+};
+
+/* ==================================================================
+   2. 物理常量
+   ================================================================== */
+const BORE   = 0.086;
+const STROKE = 0.086;
+const CONROD = 0.150;
+const CRANK_R = STROKE / 2;
+const CR = 10.5;
+const A_PISTON = Math.PI / 4 * BORE * BORE;
+const V_D = A_PISTON * STROKE;
+const V_C = V_D / (CR - 1);
+const GAMMA = 1.33;
+const R_GAS = 287;
+const LHV = 43e6;
+const STOICH = 14.7;
+const P_ATM = 101325;
+const NOZZLE_AREA = 2.24e-7;
+const CD_NOZZLE = 0.6;
+const RHO_FUEL = 740;
+
+const IVO = -10, IVC = 190, EVO = 530, EVC = 730;
+const VALVE_DUR = 200;
+
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+function pistonVolume(theta) {
+  const t = theta * Math.PI / 180;
+  const st = Math.sin(t);
+  const s = (CRANK_R + CONROD) - (CRANK_R * Math.cos(t) + Math.sqrt(CONROD * CONROD - CRANK_R * CRANK_R * st * st));
+  return V_C + A_PISTON * s;
+}
+function pistonDVdTheta(theta) {
+  const t = theta * Math.PI / 180;
+  const st = Math.sin(t), ct = Math.cos(t);
+  const den = Math.sqrt(Math.max(CONROD * CONROD - CRANK_R * CRANK_R * st * st, 1e-9));
+  const dsdt = CRANK_R * st + CRANK_R * CRANK_R * st * ct / den;
+  return A_PISTON * dsdt * Math.PI / 180;
+}
+function valveLift(theta, open, dur) {
+  let d = ((theta - open) % 720 + 720) % 720;
+  if (d >= dur) return 0;
+  const x = d / dur;
+  return 0.5 * (1 - Math.cos(2 * Math.PI * x));
+}
+
+/* ==================================================================
+   3. 仿真核心
+   ================================================================== */
+function computeCycle(P, dth) {
+  dth = dth || 0.5;
+  const rpm = P.rpm;
+  const N = Math.round(720 / dth);
+
+  const theta = new Float32Array(N + 1);
+  const p = new Float32Array(N + 1);
+  const V = new Float32Array(N + 1);
+  const T = new Float32Array(N + 1);
+  const dQ = new Float32Array(N + 1);
+  const injRate = new Float32Array(N + 1);
+  const liftIn = new Float32Array(N + 1);
+  const liftEx = new Float32Array(N + 1);
+
+  /* --- 进气状态 --- */
+  const pMan = (0.25 + 0.72 * P.throttle) * P_ATM;
+  const TMan = 300;
+  const rhoMan = pMan / (R_GAS * TMan);
+  const etaVol = clamp(0.95 - 0.40 * Math.pow((rpm - 2500) / 4500, 2), 0.35, 0.96);
+  const mAir = etaVol * rhoMan * V_D;
+
+  /* --- 燃油 --- */
+  const dP = P.railPressure * 1e5;
+  const mdot = CD_NOZZLE * NOZZLE_AREA * Math.sqrt(2 * RHO_FUEL * Math.max(dP, 1e5));
+  const mFuel = mdot * P.pulseWidth * 1e-3;
+  const AFR = mAir / Math.max(mFuel, 1e-12);
+  const lambda = AFR / STOICH;
+
+  /* --- 雾化质量 --- */
+  const atomQuality = clamp(0.82 + 0.18 * Math.min(1, P.railPressure / 180), 0.5, 1);
+
+  /* --- 喷油窗口 --- */
+  let injStart = (P.mode === 'GDI') ? (360 - P.injTiming) : P.injTiming;
+  const injDurDeg = P.pulseWidth * rpm * 0.006;
+  const injEnd = injStart + injDurDeg;
+
+  /* --- 混合气准备质量 --- */
+  let mixQuality = 1;
+  if (P.mode === 'GDI') {
+    const sparkAng = 360 - P.sparkBTDC;
+    const mixAngle = sparkAng - injEnd;
+    mixQuality = clamp(0.15 + 0.85 * clamp(mixAngle / 35, 0, 1), 0.08, 1);
+  }
+
+  /* --- 燃烧效率 --- */
+  const etaLambda = Math.exp(-1.5 * Math.pow(lambda - 1, 2));
+  let combEff = etaLambda * atomQuality * mixQuality;
+  let misfire = false;
+  if (lambda > 1.9 || lambda < 0.45 || combEff < 0.05) { misfire = true; combEff = 0; }
+
+  const mBurnable = Math.min(mFuel, mAir / STOICH);
+  const Qtot = misfire ? 0 : mBurnable * LHV * combEff;
+
+  const burnDur = clamp(
+    38 + 0.005 * rpm + 30 * (1 - atomQuality) + 25 * Math.max(0, lambda - 1) + 60 * Math.max(0, 0.9 - mixQuality),
+    30, 130
+  );
+  const soc = 360 - P.sparkBTDC;
+
+  /* --- 积分 --- */
+  let pCur = pMan;
+  const pExh = 1.06 * P_ATM;
+  const mTotal = mAir + mFuel;
+  const Vmax = V_C + V_D;
+
+  let pMax = 0, TMax = 0;
+
+  for (let i = 0; i <= N; i++) {
+    const th = i * dth;
+    const Vv = Math.max(pistonVolume(th), 1e-9);
+    const dV = pistonDVdTheta(th);
+    theta[i] = th;
+    V[i] = Vv;
+
+    const lIn = valveLift(th, IVO, VALVE_DUR);
+    const lEx = valveLift(th, EVO, VALVE_DUR);
+    liftIn[i] = lIn;
+    liftEx[i] = lEx;
+    injRate[i] = (th >= injStart && th < injEnd) ? 1 : 0;
+
+    let dQdth = 0;
+    const x = th - soc;
+    if (x > 0 && x < burnDur && Qtot > 0) {
+      const xn = x / burnDur;
+      dQdth = Qtot * 15 * xn * xn * Math.exp(-5 * xn * xn * xn) / burnDur;
+    }
+    dQ[i] = dQdth;
+
+    let dp = ((GAMMA - 1) * dQdth - GAMMA * pCur * dV) / Vv;
+    const cIn = 0.65 * lIn;
+    const cEx = 0.65 * lEx;
+    if (cIn > 0) dp += (pMan - pCur) * cIn;
+    if (cEx > 0) dp += (pExh - pCur) * cEx;
+
+    pCur = Math.max(pCur + dp * dth, 500);
+    p[i] = pCur;
+
+    const ratio = clamp(Vv / Vmax, 0.15, 1);
+    const mEff = mTotal * ratio;
+    T[i] = pCur * Vv / (Math.max(mEff, 1e-9) * R_GAS);
+
+    if (pCur > pMax) pMax = pCur;
+    if (T[i] > TMax) TMax = T[i];
+  }
+
+  /* --- 做功积分 --- */
+  let W = 0;
+  for (let i = 0; i < N; i++) {
+    W += 0.5 * (p[i] + p[i + 1]) * (V[i + 1] - V[i]);
+  }
+  W = Math.abs(W);
+
+  const cyclesPerSec = rpm / 120;
+  const power = W * cyclesPerSec;
+  const torque = W / (4 * Math.PI);
+  const imep = W / V_D;
+  const fuelEnergy = mFuel * LHV;
+  const eff = fuelEnergy > 1e-6 ? W / fuelEnergy : 0;
+
+  return {
+    theta, p, V, T, dQ, injRate, liftIn, liftEx, n: N, dth,
+    W, IMEP: imep, power, torque, eff, mFuel, mAir, AFR, lambda,
+    pMax, TMax, injStart, injDurDeg, injEnd, soc, burnDur, Qtot,
+    mixQuality, atomQuality, combEff, misfire, rpm
+  };
+}
+
+function currentParams() {
+  return {
+    rpm: RPM_FIXED,
+    throttle: CFG.throttle,
+    pulseWidth: CFG.pulseWidth,
+    railPressure: CFG.railPressure,
+    sparkBTDC: CFG.sparkBTDC,
+    injTiming: CFG.injTiming,
+    mode: CFG.mode
+  };
+}
+
+/* --- 外特性曲线计算 --- */
+function computeWOTCurve() {
+  const out = [];
+  const rpms = [];
+  for (let r = 1000; r <= 7000; r += 500) rpms.push(r);
+
+  for (const rpm of rpms) {
+    const pMan = P_ATM;
+    const etaVol = clamp(0.95 - 0.40 * Math.pow((rpm - 2500) / 4500, 2), 0.35, 0.96);
+    const mAir = etaVol * (pMan / (R_GAS * 300)) * V_D;
+    const targetAFR = 12.8;
+    const mFuelTarget = mAir / targetAFR;
+
+    const dP = CFG.railPressure * 1e5;
+    const mdot = CD_NOZZLE * NOZZLE_AREA * Math.sqrt(2 * RHO_FUEL * Math.max(dP, 1e5));
+    const pw = clamp(mFuelTarget / mdot * 1000, 0.15, 10);
+
+    const res = computeCycle({
+      rpm, throttle: 1.0,
+      pulseWidth: pw,
+      railPressure: CFG.railPressure,
+      sparkBTDC: 25,
+      injTiming: CFG.mode === 'GDI' ? 70 : 90,
+      mode: CFG.mode
+    }, 1.5);
+
+    out.push({
+      rpm,
+      power: res.power / 1000,
+      torque: res.torque,
+      eff: res.eff,
+      imep: res.IMEP / 1e5
+    });
+  }
+  return out;
+}
+
+/* ==================================================================
+   4. Three.js 场景
+   ================================================================== */
+const container = document.getElementById('app');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x070b12, 0.0050);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.5, 500);
+camera.position.set(32, 30, 46);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 15, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 18;
+controls.maxDistance = 130;
+controls.maxPolarAngle = Math.PI * 0.88;
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+/* 背景球 */
+{
+  const g = new THREE.SphereGeometry(260, 32, 32);
+  const m = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    uniforms: {
+      top: { value: new THREE.Color(0x111a28) },
+      bot: { value: new THREE.Color(0x04060a) }
+    },
+    vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `varying vec3 vP; uniform vec3 top; uniform vec3 bot;
+      void main(){ float h = normalize(vP).y*0.5+0.5;
+      gl_FragColor = vec4(mix(bot, top, pow(h,0.75)), 1.0); }`
+  });
+  scene.add(new THREE.Mesh(g, m));
+}
+
+/* ---------- 灯光 ---------- */
+scene.add(new THREE.HemisphereLight(0x9fc4ff, 0x0a1018, 0.55));
+
+const key = new THREE.DirectionalLight(0xffffff, 2.2);
+key.position.set(30, 50, 28);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = -45; key.shadow.camera.right = 45;
+key.shadow.camera.top = 55; key.shadow.camera.bottom = -25;
+key.shadow.camera.near = 1; key.shadow.camera.far = 140;
+key.shadow.bias = -0.0008;
+scene.add(key);
+
+const fill = new THREE.DirectionalLight(0x4d8fff, 1.1);
+fill.position.set(-32, 20, -24);
+scene.add(fill);
+
+const rim = new THREE.DirectionalLight(0xffa84d, 0.75);
+rim.position.set(-16, 8, 36);
+scene.add(rim);
+
+const burnLight = new THREE.PointLight(0xff7722, 0, 38, 2);
+burnLight.position.set(0, 23, 0);
+scene.add(burnLight);
+
+/* ---------- 地面 ---------- */
+{
+  const plane = new THREE.Mesh(
+    new THREE.CircleGeometry(70, 64),
+    new THREE.ShadowMaterial({ opacity: 0.42 })
+  );
+  plane.rotation.x = -Math.PI / 2;
+  plane.position.y = -16;
+  plane.receiveShadow = true;
+  scene.add(plane);
+
+  const grid = new THREE.GridHelper(130, 42, 0x1c3557, 0x101d2e);
+  grid.position.y = -15.95;
+  grid.material.transparent = true;
+  grid.material.opacity = 0.32;
+  scene.add(grid);
+}
+
+/* ==================================================================
+   5. 发动机几何（专业结构）
+   ================================================================== */
+const BORE_S = BORE * 1000 / 10;
+const STROKE_S = STROKE * 1000 / 10;
+const R_S = CRANK_R * 1000 / 10;
+const L_S = CONROD * 1000 / 10;
+const PISTON_H = 6.2;
+const CYL_R = BORE_S / 2;
+const DECK_Y = 23.8;
+const CRANK_Y = 0;
+
+function pinY(thetaDeg) {
+  const t = thetaDeg * Math.PI / 180;
+  const st = Math.sin(t);
+  return R_S * Math.cos(t) + Math.sqrt(L_S * L_S - R_S * R_S * st * st);
+}
+
+/* ---------- 材质 ---------- */
+const M = {
+  steel:    new THREE.MeshStandardMaterial({ color: 0x8e9aad, metalness: 0.95, roughness: 0.32 }),
+  steelHi:  new THREE.MeshStandardMaterial({ color: 0xd4dcea, metalness: 0.96, roughness: 0.15 }),
+  piston:   new THREE.MeshStandardMaterial({ color: 0xc8d0dc, metalness: 0.92, roughness: 0.18 }),
+  dark:     new THREE.MeshStandardMaterial({ color: 0x2a3342, metalness: 0.85, roughness: 0.45 }),
+  copper:   new THREE.MeshStandardMaterial({ color: 0xc98a4b, metalness: 0.95, roughness: 0.28 }),
+  block:    new THREE.MeshStandardMaterial({ color: 0x4a566b, metalness: 0.88, roughness: 0.42 }),
+  liner:    new THREE.MeshStandardMaterial({ color: 0x6b788c, metalness: 0.9, roughness: 0.35 }),
+  ring:     new THREE.MeshStandardMaterial({ color: 0x1a1f28, metalness: 0.95, roughness: 0.25, side: THREE.DoubleSide }),
+  glass:    new THREE.MeshPhysicalMaterial({
+    color: 0x5aa8ff, metalness: 0.0, roughness: 0.06,
+    transparent: true, opacity: 0.09, side: THREE.DoubleSide,
+    depthWrite: false, clearcoat: 1, clearcoatRoughness: 0.05
+  }),
+  glow:     new THREE.MeshBasicMaterial({
+    color: 0x8fd4ff, transparent: true, opacity: 0.85,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  }),
+  seat:     new THREE.MeshStandardMaterial({ color: 0x9aa6b8, metalness: 0.95, roughness: 0.25 }),
+  valveIn:  new THREE.MeshStandardMaterial({ color: 0x5fb0ff, metalness: 0.9, roughness: 0.22 }),
+  valveEx:  new THREE.MeshStandardMaterial({ color: 0xff8a5f, metalness: 0.9, roughness: 0.22 }),
+  spring:   new THREE.MeshStandardMaterial({ color: 0x7a8698, metalness: 0.9, roughness: 0.4 }),
+  ceramic:  new THREE.MeshStandardMaterial({ color: 0xe8e8e8, metalness: 0.1, roughness: 0.6 })
+};
+
+const engineRoot = new THREE.Group();
+scene.add(engineRoot);
+
+/* ---------- 气缸体 ---------- */
+{
+  const h = DECK_Y - 4;
+  const y0 = 4;
+
+  // 缸套（透明）
+  const linerMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(CYL_R, CYL_R, h, 72, 1, true),
+    M.glass
+  );
+  linerMesh.position.y = y0 + h / 2;
+  engineRoot.add(linerMesh);
+
+  // 缸套轮廓线
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.CylinderGeometry(CYL_R, CYL_R, h, 72, 1, true), 20),
+    new THREE.LineBasicMaterial({ color: 0x4d9eff, transparent: true, opacity: 0.20 })
+  );
+  edges.position.copy(linerMesh.position);
+  engineRoot.add(edges);
+
+  // 缸体（外部）
+  const blockOuter = new THREE.Mesh(
+    new THREE.CylinderGeometry(CYL_R + 2.4, CYL_R + 3.2, 4.0, 8),
+    M.block
+  );
+  blockOuter.position.y = y0 - 0.2;
+  blockOuter.castShadow = true;
+  blockOuter.receiveShadow = true;
+  engineRoot.add(blockOuter);
+
+  // 缸体散热片
+  for (let i = 0; i < 5; i++) {
+    const fin = new THREE.Mesh(
+      new THREE.TorusGeometry(CYL_R + 1.6, 0.28, 8, 48),
+      M.liner
+    );
+    fin.rotation.x = Math.PI / 2;
+    fin.position.y = y0 + 1.5 + i * 2.2;
+    fin.castShadow = true;
+    engineRoot.add(fin);
+  }
+
+  // 缸盖（顶部）
+  const head = new THREE.Mesh(
+    new THREE.CylinderGeometry(CYL_R + 1.0, CYL_R + 1.0, 2.4, 64),
+    M.block
+  );
+  head.position.y = DECK_Y + 1.2;
+  head.castShadow = true;
+  head.receiveShadow = true;
+  engineRoot.add(head);
+
+  // 缸盖螺栓
+  const boltPositions = [];
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4 + Math.PI / 8;
+    boltPositions.push([Math.cos(a) * (CYL_R + 1.6), Math.sin(a) * (CYL_R + 1.6)]);
+  }
+  for (const [bx, bz] of boltPositions) {
+    const bolt = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.32, 0.32, 1.0, 12),
+      M.steelHi
+    );
+    bolt.position.set(bx, DECK_Y + 2.9, bz);
+    bolt.castShadow = true;
+    engineRoot.add(bolt);
+  }
+
+  // 缸垫
+  const gasket = new THREE.Mesh(
+    new THREE.TorusGeometry(CYL_R + 0.35, 0.16, 8, 64),
+    M.copper
+  );
+  gasket.rotation.x = Math.PI / 2;
+  gasket.position.y = DECK_Y - 0.15;
+  engineRoot.add(gasket);
+}
+
+/* ---------- 活塞 ---------- */
+const pistonGroup = new THREE.Group();
+engineRoot.add(pistonGroup);
+{
+  // 活塞主体
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(CYL_R - 0.07, CYL_R - 0.07, PISTON_H, 64),
+    M.piston
+  );
+  body.castShadow = true;
+  body.receiveShadow = true;
+  pistonGroup.add(body);
+
+  // 顶部凹坑（燃烧室凹坑，GDI 特征）
+  const bowl = new THREE.Mesh(
+    new THREE.CylinderGeometry(CYL_R * 0.58, CYL_R * 0.50, 0.55, 40),
+    new THREE.MeshStandardMaterial({ color: 0x7d8798, metalness: 0.9, roughness: 0.3 })
+  );
+  bowl.position.y = PISTON_H / 2 - 0.15;
+  pistonGroup.add(bowl);
+
+  // 顶部高亮环
+  const topRing = new THREE.Mesh(
+    new THREE.TorusGeometry(CYL_R - 0.12, 0.07, 10, 64),
+    new THREE.MeshStandardMaterial({
+      color: 0x8fd4ff, emissive: 0x2a6fa8, emissiveIntensity: 0.7,
+      metalness: 0.9, roughness: 0.2
+    })
+  );
+  topRing.rotation.x = Math.PI / 2;
+  topRing.position.y = PISTON_H / 2;
+  pistonGroup.add(topRing);
+
+  // 活塞环（3 道）
+  for (let i = 0; i < 3; i++) {
+    const ring = new THREE.Mesh(
+      new THREE.CylinderGeometry(CYL_R - 0.02, CYL_R - 0.02, 0.22, 64, 1, true),
+      M.ring
+    );
+    ring.position.y = PISTON_H / 2 - 0.95 - i * 0.78;
+    pistonGroup.add(ring);
+  }
+
+  // 活塞裙部（下部稍宽）
+  const skirt = new THREE.Mesh(
+    new THREE.CylinderGeometry(CYL_R - 0.07, CYL_R - 0.10, PISTON_H * 0.4, 64),
+    M.piston
+  );
+  skirt.position.y = -PISTON_H * 0.3;
+  pistonGroup.add(skirt);
+
+  // 活塞销
+  const pin = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.58, 0.58, CYL_R * 1.55, 24),
+    M.steelHi
+  );
+  pin.rotation.x = Math.PI / 2;
+  pin.castShadow = true;
+  pistonGroup.add(pin);
+
+  // 销卡环
+  for (const z of [-CYL_R * 0.72, CYL_R * 0.72]) {
+    const clip = new THREE.Mesh(
+      new THREE.TorusGeometry(0.68, 0.07, 8, 24),
+      M.dark
+    );
+    clip.position.z = z;
+    pistonGroup.add(clip);
+  }
+}
+
+/* ---------- 连杆（工字梁造型） ---------- */
+const rodGroup = new THREE.Group();
+engineRoot.add(rodGroup);
+{
+  // 杆身（工字梁近似：中间细方柱 + 两侧薄板）
+  const beam = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, L_S - 2.2, 1.1),
+    M.steelHi
+  );
+  beam.castShadow = true;
+  rodGroup.add(beam);
+
+  // 杆身两侧加强筋
+  for (const z of [-0.72, 0.72]) {
+    const rib = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, L_S - 2.6, 0.55),
+      M.steelHi
+    );
+    rib.position.z = z;
+    rodGroup.add(rib);
+  }
+
+  // 小头（衬套）
+  const small = new THREE.Mesh(
+    new THREE.TorusGeometry(0.95, 0.42, 14, 28),
+    M.steelHi
+  );
+  small.position.y = L_S / 2 - 0.4;
+  small.castShadow = true;
+  rodGroup.add(small);
+
+  const smallBush = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.62, 0.62, 1.5, 20),
+    M.copper
+  );
+  smallBush.rotation.x = Math.PI / 2;
+  smallBush.position.y = L_S / 2 - 0.4;
+  rodGroup.add(smallBush);
+
+  // 大头（连杆瓦）
+  const big = new THREE.Mesh(
+    new THREE.TorusGeometry(1.6, 0.55, 14, 32),
+    M.steelHi
+  );
+  big.position.y = -L_S / 2 + 0.5;
+  big.castShadow = true;
+  rodGroup.add(big);
+
+  const bigBush = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.22, 1.22, 2.0, 24),
+    M.copper
+  );
+  bigBush.rotation.x = Math.PI / 2;
+  bigBush.position.y = -L_S / 2 + 0.5;
+  rodGroup.add(bigBush);
+
+  // 连杆螺栓
+  for (const x of [-1.6, 1.6]) {
+    const bolt = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.22, 2.4, 10),
+      M.dark
+    );
+    bolt.rotation.x = Math.PI / 2;
+    bolt.position.set(x, -L_S / 2 + 0.5, 0);
+    rodGroup.add(bolt);
+  }
+}
+
+/* ---------- 曲轴（含配重） ---------- */
+const crankGroup = new THREE.Group();
+engineRoot.add(crankGroup);
+{
+  // 主轴颈
+  const main = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.55, 1.55, 15, 32),
+    M.steelHi
+  );
+  main.rotation.x = Math.PI / 2;
+  main.castShadow = true;
+  crankGroup.add(main);
+
+  // 前后轴端
+  for (const z of [-8.2, 8.2]) {
+    const journal = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.15, 1.15, 1.6, 24),
+      M.steelHi
+    );
+    journal.rotation.x = Math.PI / 2;
+    journal.position.z = z;
+    journal.castShadow = true;
+    crankGroup.add(journal);
+  }
+
+  // 曲柄臂 + 配重
+  for (const z of [-3.8, 3.8]) {
+    // 曲柄臂
+    const web = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.5, 2.5, 1.2, 40),
+      M.steel
+    );
+    web.rotation.x = Math.PI / 2;
+    web.position.set(0, R_S / 2, z);
+    web.castShadow = true;
+    crankGroup.add(web);
+
+    // 配重块（扇形）
+    const cw = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.85, 2.85, 1.2, 40, 1, false, Math.PI * 0.60, Math.PI * 0.80),
+      new THREE.MeshStandardMaterial({ color: 0x6b788c, metalness: 0.95, roughness: 0.35 })
+    );
+    cw.rotation.x = Math.PI / 2;
+    cw.position.set(0, -R_S / 2, z);
+    cw.castShadow = true;
+    crankGroup.add(cw);
+  }
+
+  // 曲柄销
+  const pin = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.25, 1.25, 7.0, 28),
+    M.steelHi
+  );
+  pin.rotation.x = Math.PI / 2;
+  pin.position.set(0, R_S, 0);
+  pin.castShadow = true;
+  crankGroup.add(pin);
+
+  // 平衡重块（曲轴前端）
+  const damper = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.6, 2.6, 1.4, 40),
+    M.dark
+  );
+  damper.rotation.x = Math.PI / 2;
+  damper.position.z = 9.4;
+  damper.castShadow = true;
+  crankGroup.add(damper);
+}
+
+/* ---------- 气门 ---------- */
+function makeValve(zPos, mat, headColor) {
+  const g = new THREE.Group();
+
+  // 气门盘（蘑菇头）
+  const head = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.48, 1.22, 0.60, 36),
+    mat
+  );
+  head.position.y = -0.30;
+  head.castShadow = true;
+  g.add(head);
+
+  // 气门锥面
+  const cone = new THREE.Mesh(
+    new THREE.ConeGeometry(1.48, 0.5, 36),
+    mat
+  );
+  cone.rotation.x = Math.PI;
+  cone.position.y = -0.55;
+  g.add(cone);
+
+  // 气门杆
+  const stem = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.26, 0.26, 8.0, 16),
+    M.steelHi
+  );
+  stem.position.y = 4.0;
+  stem.castShadow = true;
+  g.add(stem);
+
+  // 气门导管
+  const guide = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.52, 0.52, 2.0, 18),
+    M.dark
+  );
+  guide.position.y = 6.6;
+  g.add(guide);
+
+  // 弹簧
+  for (let i = 0; i < 6; i++) {
+    const coil = new THREE.Mesh(
+      new THREE.TorusGeometry(0.78, 0.09, 6, 20),
+      M.spring
+    );
+    coil.rotation.x = Math.PI / 2;
+    coil.position.y = 5.6 + i * 0.42;
+    g.add(coil);
+  }
+
+  // 弹簧座
+  const retainer = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.85, 0.85, 0.32, 20),
+    M.dark
+  );
+  retainer.position.y = 8.3;
+  g.add(retainer);
+
+  g.position.set(0, DECK_Y, zPos);
+  return g;
+}
+
+const valveIn = makeValve(-2.85, M.valveIn);
+const valveEx = makeValve(2.85, M.valveEx);
+engineRoot.add(valveIn, valveEx);
+
+/* ---------- 气门座圈 ---------- */
+for (const z of [-2.85, 2.85]) {
+  const seat = new THREE.Mesh(
+    new THREE.TorusGeometry(1.45, 0.18, 10, 36),
+    M.seat
+  );
+  seat.rotation.x = Math.PI / 2;
+  seat.position.set(0, DECK_Y - 0.35, z);
+  engineRoot.add(seat);
+}
+
+/* ---------- 进气道 / 排气道 ---------- */
+{
+  // 进气道（左侧）
+  const inCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-9.5, 30, -2.85),
+    new THREE.Vector3(-6.5, 29, -2.85),
+    new THREE.Vector3(-3.5, 26.5, -2.85),
+    new THREE.Vector3(-0.4, 24.4, -2.85)
+  ]);
+  const inPort = new THREE.Mesh(
+    new THREE.TubeGeometry(inCurve, 24, 0.95, 16, false),
+    new THREE.MeshStandardMaterial({ color: 0x2c3a4e, metalness: 0.85, roughness: 0.4, side: THREE.DoubleSide })
+  );
+  inPort.castShadow = true;
+  engineRoot.add(inPort);
+
+  // 排气道（右侧）
+  const exCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.4, 24.4, 2.85),
+    new THREE.Vector3(3.5, 26.5, 2.85),
+    new THREE.Vector3(6.5, 29, 2.85),
+    new THREE.Vector3(9.5, 30, 2.85)
+  ]);
+  const exPort = new THREE.Mesh(
+    new THREE.TubeGeometry(exCurve, 24, 0.95, 16, false),
+    new THREE.MeshStandardMaterial({ color: 0x4a2f28, metalness: 0.85, roughness: 0.45, side: THREE.DoubleSide })
+  );
+  exPort.castShadow = true;
+  engineRoot.add(exPort);
+}
+
+/* ---------- 喷油器（GDI：中央布置 / PFI：进气道布置） ---------- */
+const injectorGDI = new THREE.Group();
+engineRoot.add(injectorGDI);
+{
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.58, 0.42, 4.6, 24),
+    new THREE.MeshStandardMaterial({ color: 0x3a4658, metalness: 0.85, roughness: 0.35 })
+  );
+  body.position.y = DECK_Y + 2.3;
+  body.castShadow = true;
+  injectorGDI.add(body);
+
+  const cap = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.72, 0.72, 0.6, 24),
+    M.dark
+  );
+  cap.position.y = DECK_Y + 4.8;
+  injectorGDI.add(cap);
+
+  const tip = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.28, 0.16, 1.0, 20),
+    M.copper
+  );
+  tip.position.y = DECK_Y - 0.5;
+  injectorGDI.add(tip);
+
+  // 电磁线圈接口
+  const conn = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.22, 1.1, 12),
+    new THREE.MeshStandardMaterial({ color: 0x8a6a3a, metalness: 0.9, roughness: 0.3 })
+  );
+  conn.rotation.z = Math.PI / 2;
+  conn.position.set(1.05, DECK_Y + 3.4, 0);
+  injectorGDI.add(conn);
+
+  // 高压油管接口
+  const rail = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.18, 0.18, 1.6, 12),
+    M.steelHi
+  );
+  rail.rotation.z = Math.PI / 2;
+  rail.position.set(0.9, DECK_Y + 1.4, 0);
+  injectorGDI.add(rail);
+}
+
+const injectorPFI = new THREE.Group();
+engineRoot.add(injectorPFI);
+{
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.46, 0.36, 3.2, 20),
+    new THREE.MeshStandardMaterial({ color: 0x3a4658, metalness: 0.85, roughness: 0.35 })
+  );
+  body.castShadow = true;
+  injectorPFI.add(body);
+
+  const tip = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.14, 0.8, 16),
+    M.copper
+  );
+  tip.position.y = -1.9;
+  injectorPFI.add(tip);
+
+  // 布置在进气道上方
+  injectorPFI.position.set(-6.8, 30.4, -2.85);
+  injectorPFI.rotation.z = -0.55;
+}
+
+/* ---------- 火花塞 ---------- */
+const sparkPlug = new THREE.Group();
+engineRoot.add(sparkPlug);
+{
+  const ceramic = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.36, 0.30, 2.6, 20),
+    M.ceramic
+  );
+  ceramic.position.y = DECK_Y + 2.6;
+  sparkPlug.add(ceramic);
+
+  const metal = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.42, 0.42, 1.2, 20),
+    M.steelHi
+  );
+  metal.position.y = DECK_Y + 1.0;
+  sparkPlug.add(metal);
+
+  const hex = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.55, 0.55, 0.5, 6),
+    M.steelHi
+  );
+  hex.position.y = DECK_Y + 1.7;
+  sparkPlug.add(hex);
+
+  // 电极
+  const electrode = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.10, 0.10, 0.7, 10),
+    M.steelHi
+  );
+  electrode.position.y = DECK_Y - 0.45;
+  sparkPlug.add(electrode);
+
+  // 侧电极
+  const sideElectrode = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.10, 0.10),
+    M.steelHi
+  );
+  sideElectrode.position.set(0.20, DECK_Y - 0.75, 0);
+  sparkPlug.add(sideElectrode);
+
+  sparkPlug.position.set(1.6, 0, 0);
+}
+
+/* ---------- 喷油锥 ---------- */
+const sprayGroup = new THREE.Group();
+engineRoot.add(sprayGroup);
+
+const sprayMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.DoubleSide,
+  blending: THREE.AdditiveBlending,
+  uniforms: {
+    uColor: { value: new THREE.Color(0x66ccff) },
+    uOpacity: { value: 0.0 }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vNormalW;
+    void main(){
+      vUv = uv;
+      vNormalW = normalize(normalMatrix * normal);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: `
+    varying vec2 vUv;
+    varying vec3 vNormalW;
+    uniform vec3 uColor;
+    uniform float uOpacity;
+    void main(){
+      float t = clamp(vUv.y, 0.0, 1.0);
+      float a = pow(t, 1.6);
+      float edge = 0.55 + 0.45 * abs(vNormalW.z);
+      gl_FragColor = vec4(uColor, a * uOpacity * edge);
+    }`
+});
+
+const sprayCone = new THREE.Mesh(new THREE.ConeGeometry(2.1, 5.2, 40, 1, true), sprayMat);
+engineRoot.add(sprayCone);
+
+const sprayCoreMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.DoubleSide,
+  blending: THREE.AdditiveBlending,
+  uniforms: {
+    uColor: { value: new THREE.Color(0xbfe9ff) },
+    uOpacity: { value: 0.0 }
+  },
+  vertexShader: sprayMat.vertexShader,
+  fragmentShader: sprayMat.fragmentShader
+});
+const sprayCore = new THREE.Mesh(new THREE.ConeGeometry(0.95, 3.8, 32, 1, true), sprayCoreMat);
+engineRoot.add(sprayCore);
+
+/* ---------- 燃烧火焰 ---------- */
+const flameMat = new THREE.MeshBasicMaterial({
+  color: 0xff8833, transparent: true, opacity: 0,
+  blending: THREE.AdditiveBlending, depthWrite: false
+});
+const flameBall = new THREE.Mesh(new THREE.SphereGeometry(2.7, 24, 20), flameMat);
+flameBall.position.y = DECK_Y - 2.4;
+engineRoot.add(flameBall);
+
+/* ==================================================================
+   6. 场景更新
+   ================================================================== */
+let SIM = computeCycle(currentParams(), 0.5);
+
+function sampleAt(theta, arr, sim) {
+  const idx = Math.floor(theta / sim.dth);
+  if (idx < 0) return arr[0];
+  if (idx >= sim.n) return arr[sim.n];
+  const f = theta / sim.dth - idx;
+  return arr[idx] * (1 - f) + arr[idx + 1] * f;
+}
+
+function updateScene(theta) {
+  const t = theta * Math.PI / 180;
+
+  /* 活塞 */
+  const py = pinY(theta);
+  pistonGroup.position.y = py;
+
+  /* 连杆 */
+  const crankPinX = R_S * Math.sin(t);
+  const crankPinY = R_S * Math.cos(t);
+  const dx = 0 - crankPinX;
+  const dy = py - crankPinY;
+  rodGroup.position.set(crankPinX / 2, (crankPinY + py) / 2, 0);
+  rodGroup.rotation.z = Math.atan2(-dx, dy);
+
+  /* 曲轴 */
+  crankGroup.rotation.z = -t;
+
+  /* 气门 */
+  const lIn = valveLift(theta, IVO, VALVE_DUR);
+  const lEx = valveLift(theta, EVO, VALVE_DUR);
+  valveIn.position.y = DECK_Y - lIn * 1.0;
+  valveEx.position.y = DECK_Y - lEx * 1.0;
+
+  /* 喷油器显隐 */
+  injectorGDI.visible = (CFG.mode === 'GDI');
+  injectorPFI.visible = (CFG.mode === 'PFI');
+
+  /* 喷雾 */
+  const { injStart, injEnd } = SIM;
+  let injActive = false;
+  let injProgress = 0;
+  if (injEnd > injStart) {
+    if (theta >= injStart && theta <= injEnd) {
+      injActive = true;
+      injProgress = (theta - injStart) / (injEnd - injStart);
+    }
+  }
+
+  if (CFG.mode === 'GDI') {
+    sprayCone.visible = true;
+    sprayCore.visible = true;
+    sprayCone.position.set(0, DECK_Y - 2.6, 0);
+    sprayCore.position.set(0, DECK_Y - 1.95, 0);
+  } else {
+    sprayCone.visible = true;
+    sprayCore.visible = true;
+    sprayCone.position.set(-6.2, 28.6, -2.85);
+    sprayCore.position.set(-6.4, 29.4, -2.85);
+  }
+
+  const targetOp = injActive ? (1 - 0.25 * injProgress) : 0;
+  sprayMat.uniforms.uOpacity.value += (targetOp - sprayMat.uniforms.uOpacity.value) * 0.35;
+  sprayCoreMat.uniforms.uOpacity.value += (targetOp * 0.9 - sprayCoreMat.uniforms.uOpacity.value) * 0.35;
+
+  const targetColor = CFG.mode === 'GDI' ? 0x66ccff : 0xffbb55;
+  sprayMat.uniforms.uColor.value.lerp(new THREE.Color(targetColor), 0.1);
+  sprayCoreMat.uniforms.uColor.value.lerp(
+    new THREE.Color(CFG.mode === 'GDI' ? 0xd8f2ff : 0xffe0a0), 0.1
+  );
+
+  const coneScale = 0.85 + 0.35 * (CFG.railPressure / 300);
+  sprayCone.scale.set(coneScale, 1, coneScale);
+  sprayCore.scale.set(coneScale * 0.9, 1, coneScale * 0.9);
+
+  /* 燃烧辉光 */
+  const heat = sampleAt(theta, SIM.dQ, SIM);
+  const heatNorm = SIM.Qtot > 0 ? heat / (SIM.Qtot * 0.02 + 1e-9) : 0;
+  const glow = clamp(heatNorm * 0.35, 0, 1);
+
+  flameMat.opacity += (glow * 0.55 - flameMat.opacity) * 0.28;
+  flameBall.scale.setScalar(0.5 + glow * 0.9);
+  flameBall.visible = flameMat.opacity > 0.01;
+
+  if (CFG.mode === 'GDI') {
+    flameBall.position.set(0, DECK_Y - 2.5, 0);
+  } else {
+    flameBall.position.set(0, DECK_Y - 2.5, 0);
+  }
+
+  burnLight.intensity += (glow * 280 - burnLight.intensity) * 0.25;
+  burnLight.color.setHSL(0.06 + 0.04 * (1 - glow), 1.0, 0.5);
+  burnLight.position.y = DECK_Y - 2.5;
+}
+
+/* ==================================================================
+   7. 图表绘制
+   ================================================================== */
+const chartCanvas = document.getElementById('chart');
+const chartCtx = chartCanvas.getContext('2d');
+const perfCanvas = document.getElementById('perfChart');
+const perfCtx = perfCanvas.getContext('2d');
+
+let perfData = null;
+
+function resizeCharts() {
+  const dpr = Math.min(window.devicePixelRatio, 2);
+  for (const c of [chartCanvas, perfCanvas]) {
+    const w = c.clientWidth, h = c.clientHeight;
+    if (w === 0 || h === 0) continue;
+    c.width = Math.max(1, Math.floor(w * dpr));
+    c.height = Math.max(1, Math.floor(h * dpr));
+    c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+}
+
+function drawChart(curAngle) {
+  const W = chartCanvas.clientWidth;
+  const H = chartCanvas.clientHeight;
+  if (W === 0 || H === 0) return;
+
+  const ctx = chartCtx;
+  ctx.clearRect(0, 0, W, H);
+
+  const padL = 28, padR = 8, padT = 8, padB = 16;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  let pMaxBar = 0;
+  for (let i = 0; i <= SIM.n; i++) {
+    const b = SIM.p[i] / 1e5;
+    if (b > pMaxBar) pMaxBar = b;
+  }
+  pMaxBar = Math.max(pMaxBar * 1.1, 30);
+
+  ctx.strokeStyle = 'rgba(90,160,255,0.10)';
+  ctx.lineWidth = 1;
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.fillStyle = 'rgba(120,145,175,0.75)';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+
+  const ySteps = 4;
+  for (let i = 0; i <= ySteps; i++) {
+    const y = padT + plotH * (1 - i / ySteps);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(W - padR, y);
+    ctx.stroke();
+    ctx.fillText(Math.round(pMaxBar * i / ySteps), padL - 5, y);
+  }
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for (let i = 0; i <= 4; i++) {
+    const x = padL + plotW * i / 4;
+    ctx.fillText(Math.round(720 * i / 4) + '°', x, H - padB + 3);
+  }
+
+  // TDC 线
+  const tdcX = padL + plotW * (360 / 720);
+  ctx.strokeStyle = 'rgba(120,160,220,0.25)';
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(tdcX, padT);
+  ctx.lineTo(tdcX, padT + plotH);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 喷油窗口
+  if (SIM.injDurDeg > 0 && SIM.injDurDeg < 300) {
+    const x0 = padL + plotW * (SIM.injStart / 720);
+    const x1 = padL + plotW * (Math.min(SIM.injEnd, 720) / 720);
+    ctx.fillStyle = 'rgba(93,255,176,0.14)';
+    ctx.fillRect(x0, padT, Math.max(x1 - x0, 1.5), plotH);
+  }
+
+  // 放热率
+  let qMax = 0;
+  for (let i = 0; i <= SIM.n; i++) if (SIM.dQ[i] > qMax) qMax = SIM.dQ[i];
+  if (qMax > 0) {
+    ctx.beginPath();
+    for (let i = 0; i <= SIM.n; i += 2) {
+      const x = padL + plotW * (SIM.theta[i] / 720);
+      const y = padT + plotH * (1 - (SIM.dQ[i] / qMax) * 0.55);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(255,180,84,0.75)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  // 压力曲线
+  ctx.beginPath();
+  for (let i = 0; i <= SIM.n; i++) {
+    const x = padL + plotW * (SIM.theta[i] / 720);
+    const y = padT + plotH * (1 - (SIM.p[i] / 1e5) / pMaxBar);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = '#4da3ff';
+  ctx.lineWidth = 1.6;
+  ctx.shadowColor = 'rgba(77,163,255,0.85)';
+  ctx.shadowBlur = 6;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.lineTo(padL + plotW, padT + plotH);
+  ctx.lineTo(padL, padT + plotH);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+  grad.addColorStop(0, 'rgba(77,163,255,0.22)');
+  grad.addColorStop(1, 'rgba(77,163,255,0.01)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // 游标
+  const cx = padL + plotW * (curAngle / 720);
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx, padT);
+  ctx.lineTo(cx, padT + plotH);
+  ctx.stroke();
+
+  const cp = sampleAt(curAngle, SIM.p, SIM) / 1e5;
+  const cy = padT + plotH * (1 - cp / pMaxBar);
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = '#4da3ff';
+  ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+function drawPerfChart() {
+  const W = perfCanvas.clientWidth;
+  const H = perfCanvas.clientHeight;
+  if (W === 0 || H === 0 || !perfData) return;
+
+  const ctx = perfCtx;
+  ctx.clearRect(0, 0, W, H);
+
+  const padL = 32, padR = 36, padT = 12, padB = 20;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  let maxP = 0, maxT = 0, maxE = 0;
+  for (const d of perfData) {
+    if (d.power > maxP) maxP = d.power;
+    if (d.torque > maxT) maxT = d.torque;
+    if (d.eff > maxE) maxE = d.eff;
+  }
+  maxP = Math.max(maxP * 1.15, 10);
+  maxT = Math.max(maxT * 1.15, 30);
+  maxE = Math.max(maxE * 1.15, 0.2);
+
+  const rpmMin = perfData[0].rpm;
+  const rpmMax = perfData[perfData.length - 1].rpm;
+  const xOf = (rpm) => padL + plotW * (rpm - rpmMin) / (rpmMax - rpmMin);
+
+  // 网格
+  ctx.strokeStyle = 'rgba(90,160,255,0.09)';
+  ctx.lineWidth = 1;
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.fillStyle = 'rgba(120,145,175,0.7)';
+  ctx.textBaseline = 'middle';
+
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + plotH * (1 - i / 4);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + plotW, y);
+    ctx.stroke();
+  }
+
+  // X 轴刻度
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for (let i = 0; i <= 6; i++) {
+    const rpm = rpmMin + (rpmMax - rpmMin) * i / 6;
+    ctx.fillText(Math.round(rpm / 100) / 10 + 'k', xOf(rpm), H - padB + 3);
+  }
+
+  // 左轴（扭矩）
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(255,180,84,0.85)';
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + plotH * (1 - i / 4);
+    ctx.fillText(Math.round(maxT * i / 4), padL - 4, y);
+  }
+
+  // 右轴（功率）
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255,107,157,0.85)';
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + plotH * (1 - i / 4);
+    ctx.fillText(Math.round(maxP * i / 4), padL + plotW + 4, y);
+  }
+
+  // 热效率曲线（虚底）
+  ctx.beginPath();
+  for (let i = 0; i < perfData.length; i++) {
+    const d = perfData[i];
+    const x = xOf(d.rpm);
+    const y = padT + plotH * (1 - d.eff / maxE);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = 'rgba(93,255,176,0.5)';
+  ctx.lineWidth = 1.2;
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 扭矩曲线
+  ctx.beginPath();
+  for (let i = 0; i < perfData.length; i++) {
+    const d = perfData[i];
+    const x = xOf(d.rpm);
+    const y = padT + plotH * (1 - d.torque / maxT);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = '#ffb454';
+  ctx.lineWidth = 2.0;
+  ctx.shadowColor = 'rgba(255,180,84,0.7)';
+  ctx.shadowBlur = 7;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // 扭矩数据点
+  for (const d of perfData) {
+    ctx.beginPath();
+    ctx.arc(xOf(d.rpm), padT + plotH * (1 - d.torque / maxT), 2.4, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd9a0';
+    ctx.fill();
+  }
+
+  // 功率曲线
+  ctx.beginPath();
+  for (let i = 0; i < perfData.length; i++) {
+    const d = perfData[i];
+    const x = xOf(d.rpm);
+    const y = padT + plotH * (1 - d.power / maxP);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = '#ff6b9d';
+  ctx.lineWidth = 2.0;
+  ctx.shadowColor = 'rgba(255,107,157,0.7)';
+  ctx.shadowBlur = 7;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  for (const d of perfData) {
+    ctx.beginPath();
+    ctx.arc(xOf(d.rpm), padT + plotH * (1 - d.power / maxP), 2.4, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffc0d8';
+    ctx.fill();
+  }
+
+  // 峰值标注
+  let bestP = perfData[0], bestT = perfData[0];
+  for (const d of perfData) {
+    if (d.power > bestP.power) bestP = d;
+    if (d.torque > bestT.torque) bestT = d;
+  }
+
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.fillStyle = '#ff6b9d';
+  ctx.textAlign = 'center';
+  ctx.fillText('峰值 ' + bestP.power.toFixed(1) + 'kW', xOf(bestP.rpm), padT + plotH * (1 - bestP.power / maxP) - 8);
+  ctx.fillStyle = '#ffb454';
+  ctx.fillText('峰值 ' + bestT.torque.toFixed(1) + 'N·m', xOf(bestT.rpm), padT + plotH * (1 - bestT.torque / maxT) - 8);
+
+  // 更新汇总
+  let maxEff = 0, maxImep = 0;
+  for (const d of perfData) {
+    if (d.eff > maxEff) maxEff = d.eff;
+    if (d.imep > maxImep) maxImep = d.imep;
+  }
+  document.getElementById('p-pmax').innerHTML = bestP.power.toFixed(2) + '<small>kW</small>';
+  document.getElementById('p-tmax').innerHTML = bestT.torque.toFixed(1) + '<small>N·m</small>';
+  document.getElementById('p-emax').innerHTML = (maxEff * 100).toFixed(1) + '<small>%</small>';
+  document.getElementById('p-imax').innerHTML = maxImep.toFixed(2) + '<small>bar</small>';
+}
+
+/* ==================================================================
+   8. UI 绑定
+   ================================================================== */
+const el = (id) => document.getElementById(id);
+let simDirty = true;
+let perfDirty = true;
+
+function bindSlider(id, key, fmt) {
+  const input = el(id);
+  const label = el('v-' + id);
+  const update = () => {
+    const v = parseFloat(input.value);
+    CFG[key] = v;
+    if (label) label.innerHTML = fmt(v);
+    simDirty = true;
+    perfDirty = true;
+  };
+  input.addEventListener('input', update);
+  update();
+}
+
+bindSlider('thr', 'throttle', v => `${v} <small>%</small>`);
+CFG.throttle = parseFloat(el('thr').value) / 100;
+el('thr').addEventListener('input', () => {
+  CFG.throttle = parseFloat(el('thr').value) / 100;
+  simDirty = true;
+  perfDirty = true;
+});
+
+bindSlider('injT', 'injTiming', v => `${v} <small>°</small>`);
+bindSlider('pw', 'pulseWidth', v => `${v.toFixed(2)} <small>ms</small>`);
+bindSlider('rp', 'railPressure', v => `${v} <small>bar</small>`);
+bindSlider('sp', 'sparkBTDC', v => `${v} <small>°</small>`);
+bindSlider('ps', 'playSpeed', v => `${v.toFixed(3)} <small>×</small>`);
+
+el('ca').addEventListener('input', () => {
+  CFG.manualCA = parseFloat(el('ca').value);
+  CFG.manualMode = true;
+  CFG.paused = true;
+  el('btnPlay').textContent = '▶ 播放';
+  el('v-ca').innerHTML = `${CFG.manualCA.toFixed(0)} <small>°</small>`;
+});
+
+document.querySelectorAll('#modeSeg button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#modeSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    CFG.mode = btn.dataset.mode;
+
+    const label = el('injTimingLabel');
+    const slider = el('injT');
+
+    if (CFG.mode === 'GDI') {
+      label.textContent = '喷油正时 (BTDC)';
+      slider.min = 10; slider.max = 180; slider.value = 70;
+    } else {
+      label.textContent = '喷油正时 (ATDC 进气)';
+      slider.min = 0; slider.max = 170; slider.value = 90;
+    }
+    CFG.injTiming = parseFloat(slider.value);
+    el('v-injT').innerHTML = `${CFG.injTiming} <small>°</small>`;
+
+    simDirty = true;
+    perfDirty = true;
+
+    el('hintText').textContent = CFG.mode === 'GDI'
+      ? '缸内直喷：喷油器位于燃烧室中央，燃油在压缩冲程高压喷入气缸，混合时间短。'
+      : '进气道喷射：喷油器位于进气道，燃油在进气冲程喷入气道，与空气充分混合。';
+  });
+});
+
+el('btnPlay').addEventListener('click', () => {
+  CFG.paused = !CFG.paused;
+  if (!CFG.paused) CFG.manualMode = false;
+  el('btnPlay').textContent = CFG.paused ? '▶ 播放' : '⏸ 暂停';
+});
+
+el('btnReset').addEventListener('click', () => {
+  camera.position.set(32, 30, 46);
+  controls.target.set(0, 15, 0);
+  controls.update();
+});
+
+/* 选项卡切换 */
+document.querySelectorAll('#tabbar button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabbar button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tabpane').forEach(p => p.classList.add('hidden'));
+    el('pane-' + btn.dataset.tab).classList.remove('hidden');
+
+    requestAnimationFrame(() => {
+      resizeCharts();
+      if (btn.dataset.tab === 'perf') {
+        if (perfDirty || !perfData) {
+          perfData = computeWOTCurve();
+          perfDirty = false;
+        }
+        drawPerfChart();
+      } else if (btn.dataset.tab === 'live') {
+        drawChart(crankAngle);
+      }
+    });
+  });
+});
+
+/* ==================================================================
+   9. 主循环
+   ================================================================== */
+const clock = new THREE.Clock();
+let crankAngle = 0;
+
+function strokeName(th) {
+  if (th < 180) return '进气';
+  if (th < 360) return '压缩';
+  if (th < 540) return '做功';
+  return '排气';
+}
+
+function updateReadouts() {
+  const th = crankAngle;
+  el('d-stroke').textContent = SIM.misfire ? '失火' : strokeName(th);
+  el('d-angle').textContent = th.toFixed(1) + '°';
+
+  const pBar = sampleAt(th, SIM.p, SIM) / 1e5;
+  const tK = sampleAt(th, SIM.T, SIM);
+
+  el('d-press').innerHTML = `${pBar.toFixed(2)}<small>bar</small>`;
+  el('d-temp').innerHTML = `${Math.round(tK)}<small>K</small>`;
+  el('d-afr').textContent = SIM.AFR.toFixed(2);
+  el('d-lam').textContent = SIM.lambda.toFixed(3);
+  el('d-fuel').innerHTML = `${(SIM.mFuel * 1e6).toFixed(1)}<small>mg</small>`;
+  el('d-injdur').innerHTML = `${SIM.injDurDeg.toFixed(1)}<small>°CA</small>`;
+  el('d-power').innerHTML = `${(SIM.power / 1000).toFixed(2)}<small>kW</small>`;
+  el('d-torque').innerHTML = `${SIM.torque.toFixed(1)}<small>N·m</small>`;
+  el('d-eff').innerHTML = `${(SIM.eff * 100).toFixed(1)}<small>%</small>`;
+  el('d-imep').innerHTML = `${(SIM.IMEP / 1e5).toFixed(2)}<small>bar</small>`;
+
+  const afrEl = el('d-afr');
+  if (SIM.lambda < 0.9) afrEl.style.color = '#ff9a5f';
+  else if (SIM.lambda > 1.1) afrEl.style.color = '#5fd0ff';
+  else afrEl.style.color = '#5dffb0';
+
+  const effEl = el('d-eff');
+  effEl.style.color = SIM.eff > 0.30 ? '#5dffb0' : (SIM.eff > 0.18 ? '#ffd166' : '#ff6b6b');
+
+  const strokeEl = el('d-stroke');
+  if (SIM.misfire) {
+    strokeEl.style.color = '#ff6b6b';
+    strokeEl.style.textShadow = '0 0 14px rgba(255,107,107,.8)';
+  } else {
+    strokeEl.style.color = '#5fd0ff';
+    strokeEl.style.textShadow = '0 0 14px rgba(95,208,255,.6)';
+  }
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if (simDirty) {
+    SIM = computeCycle(currentParams(), 0.5);
+    simDirty = false;
+  }
+
+  // 推进曲轴角（由播放倍速控制）
+  if (!CFG.paused) {
+    const degPerSec = RPM_FIXED * 6 * CFG.playSpeed;
+    crankAngle += degPerSec * dt;
+    if (crankAngle >= 720) crankAngle -= 720;
+    el('ca').value = crankAngle.toFixed(0);
+    el('v-ca').innerHTML = `${crankAngle.toFixed(0)} <small>°</small>`;
+  } else if (CFG.manualMode) {
+    crankAngle = CFG.manualCA;
+  }
+
+  updateScene(crankAngle);
+  updateReadouts();
+
+  // 只在实时页可见时绘制
+  if (!el('pane-live').classList.contains('hidden')) {
+    drawChart(crankAngle);
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ==================================================================
+   10. 窗口适配 & 启动
+   ================================================================== */
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  resizeCharts();
+  if (perfData && !el('pane-perf').classList.contains('hidden')) drawPerfChart();
+}
+window.addEventListener('resize', onResize);
+
+resizeCharts();
+animate();
+</script>
+
+<!-- ↓↓↓ 演示厅 SDK：独立访问时提供「返回演示厅」入口；被演示厅内嵌（iframe）时自动隐藏 -->
+<a id="wb-back" href="../" title="返回演示厅">← 演示厅</a>
+<script>(function(){if(window.self!==window.top){var e=document.getElementById('wb-back');if(e)e.parentNode.removeChild(e);}})();</script>
+<style>
+#wb-back{position:fixed;left:12px;bottom:12px;z-index:2147483000;display:inline-flex;align-items:center;
+  padding:6px 13px;border-radius:999px;text-decoration:none;color:#fff;opacity:.42;
+  font:600 12px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Arial,sans-serif;
+  background:rgba(0,0,0,.5);border:1px solid rgba(223,182,95,.6);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  transition:opacity .25s ease,transform .25s ease}
+#wb-back:hover{opacity:1;transform:translateY(-1px)}
+</style>
+<!-- ↑↑↑ 演示厅 SDK 结束 -->
+</body>
+</html>
