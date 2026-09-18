@@ -507,11 +507,15 @@
                 String(label === '全部' ? !S.tag : S.tag === label));
         }
 
+        // 计数行：「共 N 个演示 · 提示」，格式与主站仓库展示页的 #repo-summary 一致
+        // （「共 13 个仓库 · 点击卡片可跳转到仓库主页」）。提示文案取自 demos.json
+        // 的 subtitle，所以改文案不用动代码。
         var total = (S.graph.demos || []).length;
         if (summary) {
-            summary.textContent = list.length === total
+            var hint = S.graph.subtitle ? ' · ' + S.graph.subtitle : '';
+            summary.textContent = (list.length === total
                 ? '共 ' + total + ' 个演示'
-                : '匹配 ' + list.length + ' / ' + total + ' 个演示';
+                : '匹配 ' + list.length + ' / ' + total + ' 个演示') + hint;
         }
 
         // 等浏览器量完尺寸再画封面
@@ -562,10 +566,8 @@
                     if (d && d.slug) S.bySlug[d.slug] = d;
                 });
 
-                var t = document.getElementById('dm-hero-title');
+                var t = document.getElementById('dm-title');
                 if (t && data.title) t.textContent = data.title;
-                var sub = document.getElementById('dm-hero-sub');
-                if (sub && data.subtitle) sub.textContent = data.subtitle;
 
                 buildTagChips();
                 applyFilter();

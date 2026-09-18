@@ -28,23 +28,26 @@
 
     <main id="content">
         <section class="dm-root">
-            <div class="dm-hero">
-                <h1>🧪 <span class="dm-hero-mark" id="dm-hero-title">姜的演示厅</span></h1>
-                <p id="dm-hero-sub">一些跑在浏览器里的小玩意 · 点开卡片就地展开，也可以拎出来单独看</p>
-                <div class="dm-hero-rule"></div>
-            </div>
-
+            <!-- 页头与主站「仓库展示」页（/repos/）同一套版式：返回按钮在标题左边（同一行），
+                 下面是「共 N 个演示 · 提示」的计数行，再下面是标签与搜索。
+                 用 h2 而不是 h1：主站首页已经有 h1（「氦，欢迎来到姜的网上小窝」），
+                 而静默跳转会把这一整块搬进它的 <main> 里，同一文档不能出现两个 h1
+                 （/repos/ 用的也是 h2）。 -->
             <div class="dm-toolbar">
                 <a class="dm-backlink" href="../" data-silent>← 返回主页</a>
-                <span class="dm-count" id="dm-summary"></span>
+                <h2 class="dm-title">🧪 <span id="dm-title">姜的演示厅</span></h2>
+            </div>
+
+            <p class="dm-summary" id="dm-summary"></p>
+
+            <div class="dm-filters">
+                <div class="dm-tags" id="dm-tags" role="group" aria-label="按标签筛选"></div>
                 <label class="dm-search">
                     <input id="dm-search" type="search" placeholder="搜个关键字…" autocomplete="off"
                         aria-label="搜索演示">
                     <button class="dm-search-clear" type="button" aria-label="清空搜索">✕</button>
                 </label>
             </div>
-
-            <div class="dm-tags" id="dm-tags" role="group" aria-label="按标签筛选"></div>
 
             <div class="dm-grid" id="dm-grid"></div>
 

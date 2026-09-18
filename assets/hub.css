@@ -25,7 +25,6 @@
    ========================================================================== */
 :root {
     --dm-gold: #dfb65f;
-    --dm-gold-soft: rgba(223, 182, 95, 0.45);
     --dm-gold-faint: rgba(223, 182, 95, 0.18);
     --dm-card-bg: rgba(0, 0, 0, 0.45);
     --dm-card-bg-hover: rgba(0, 0, 0, 0.58);
@@ -142,85 +141,65 @@ body.dm-lock {
     color: var(--dm-text);
 }
 
-/* ---------- 头部标题区 ---------- */
-.dm-hero {
-    text-align: center;
-    padding: 6px 0 2px;
-}
-
-.dm-hero h1 {
-    margin: 0 0 10px;
-    font-size: clamp(1.6rem, 4.2vw, 2.5rem);
-    letter-spacing: 0.02em;
-    color: var(--dm-text);
-    text-shadow: var(--dm-text-shadow);
-}
-
-.dm-hero h1 .dm-hero-mark {
-    background: linear-gradient(180deg, #ffe6ac, var(--dm-gold));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9));
-}
-
-.dm-hero p {
-    margin: 0 auto;
-    max-width: 640px;
-    color: var(--dm-text-dim);
-    text-shadow: var(--dm-text-shadow);
-    font-size: 0.95rem;
-    line-height: 1.7;
-}
-
-.dm-hero-rule {
-    width: 88px;
-    height: 3px;
-    margin: 16px auto 0;
-    border-radius: 3px;
-    background: linear-gradient(90deg, transparent, var(--dm-gold), transparent);
-    box-shadow: 0 0 14px var(--dm-gold-soft);
-}
-
-/* ---------- 工具条：返回 / 计数 / 搜索 / 标签 ---------- */
+/* ---------- 页头：返回 + 标题同一行，计数行在下面 ----------
+   版式刻意与主站「仓库展示」页（/repos/ 的 .repos-toolbar + #repo-summary）一致：
+   返回按钮在标题左边、整行居中，标题用普通白色文字 + 文字阴影（不做渐变），
+   计数行是居中灰字。两边看起来才像一套东西。 */
 .dm-toolbar {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 12px;
-    margin: 22px 0 6px;
+    gap: 16px;
+}
+
+.dm-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #fff;
+    text-shadow: var(--dm-text-shadow);
 }
 
 .dm-backlink {
-    display: inline-block;
     color: #fff;
     text-decoration: none;
     background: rgba(0, 0, 0, 0.35);
     padding: 6px 16px;
     border-radius: 999px;
     box-shadow: var(--dm-shadow);
-    font-size: 0.9rem;
     transition: background-color 0.3s, transform 0.3s;
 }
 
 .dm-backlink:hover {
     background-color: var(--dm-gold);
-    color: #241c05;
     transform: scale(1.03);
 }
 
-.dm-count {
+/* 计数行：␣共 N 个演示 · 提示␣（由 hub.js 填，格式同 #repo-summary） */
+.dm-summary {
+    margin: 12px 0 20px;
+    text-align: center;
     color: var(--dm-text-dim);
     text-shadow: var(--dm-text-shadow);
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+}
+
+/* ---------- 筛选行：标签 + 搜索 ---------- */
+.dm-filters {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 0 0 20px;
 }
 
 .dm-search {
     position: relative;
-    flex: 0 1 260px;
-    min-width: 180px;
+    flex: 0 1 230px;
+    min-width: 170px;
 }
 
 .dm-search input {
@@ -283,7 +262,7 @@ body.dm-lock {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    margin: 12px 0 22px;
+    margin: 0; /* 外边距交给 .dm-filters 统一控制 */
 }
 
 .dm-tag-chip {

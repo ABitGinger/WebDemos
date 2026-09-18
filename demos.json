@@ -1,7 +1,7 @@
 {
   "version": 1,
   "title": "姜的演示厅",
-  "subtitle": "一些跑在浏览器里的小玩意 · 点开卡片就地展开，也可以拎出来单独看",
+  "subtitle": "点开卡片就地展开，也可以拎出来单独看",
   "demos": [
     {
       "slug": "study-noise",
