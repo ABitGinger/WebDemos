@@ -1,0 +1,25 @@
+# WebDemos · 演示厅仓库
+# 说明：本仓库是纯静态站点，源码即产物，正常情况下一律提交。
+
+# 构建 / 部署过程的临时产物
+dist/
+.cache/
+.tmp/
+
+# 依赖与虚拟环境（当前零依赖，留作以后备用）
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志
+*.log
+npm-debug.log*
