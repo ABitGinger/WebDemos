@@ -1,0 +1,55 @@
+# 把演示厅部署到本仓库的 GitHub Pages（预览用）。
+#
+# 正式地址是主站的 https://abitginger.github.io/demo/ ，
+# 由主站 ABitGinger.github.io 的 static.yml 在构建时把本仓库同步进 demo/ 目录。
+# 这里额外部署一份，是为了在改动 WebDemos 时能立刻有个独立地址看效果，
+# 也方便把某一个演示单独分享出去（/WebDemos/demos/<slug>/）。
+name: 部署演示厅（仓库预览）
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "webdemos-pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      # 清单与目录对不上时给出提示，但不阻断部署（避免一个笔误把站点卡住）
+      - name: 校验 demos.json
+        continue-on-error: true
+        run: python scripts/check.py
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "."
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
