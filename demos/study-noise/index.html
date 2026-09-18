@@ -585,8 +585,18 @@ requestAnimationFrame(frame);
 </script>
 
 <!-- ↓↓↓ 演示厅 SDK：独立访问时提供「返回演示厅」入口；被演示厅内嵌（iframe）时自动隐藏 -->
-<a id="wb-back" href="../" title="返回演示厅">← 演示厅</a>
-<script>(function(){if(window.self!==window.top){var e=document.getElementById('wb-back');if(e)e.parentNode.removeChild(e);}})();</script>
+<a id="wb-back" href="../../" title="返回演示厅">← 演示厅</a>
+<script>
+/* 演示厅 SDK：href 由自身路径反推，换挂载点（/WebDemos/、/demo/…）或改层级都不用动这里。
+   演示固定放在 <演示厅根>/demos/<slug>/ 下，所以砍掉这段尾巴就是演示厅根。 */
+(function () {
+  var a = document.getElementById('wb-back');
+  if (!a) return;
+  if (window.self !== window.top) { a.parentNode.removeChild(a); return; }
+  var hall = location.pathname.replace(/demos\/[^/]+\/.*$/, '');
+  if (hall && hall !== location.pathname) a.href = hall;
+})();
+</script>
 <style>
 #wb-back{position:fixed;left:12px;bottom:12px;z-index:2147483000;display:inline-flex;align-items:center;
   padding:6px 13px;border-radius:999px;text-decoration:none;color:#fff;opacity:.42;
